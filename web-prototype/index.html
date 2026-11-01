@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Crunchee — Butter Path Prototype</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#f7dcc4;
+    font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-user-select:none; user-select:none; touch-action:none; }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  .pill { background:rgba(70,45,35,.55); color:#fff; border-radius:999px;
+    padding:6px 16px; font-weight:700; letter-spacing:.08em; }
+
+  #hud { position:fixed; top:14px; left:0; right:0; display:flex;
+    flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:5; }
+  #title { font-size:15px; }
+  #step { font-size:14px; background:rgba(255,255,255,.75); color:#7a4a2b; }
+
+  /* ---- controls ---- */
+  .ctl { position:fixed; bottom:26px; z-index:10; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #stickWrap { left:22px; }
+  #jumpWrap { right:22px; }
+  #stick { width:132px; height:132px; border-radius:50%;
+    background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.75);
+    position:relative; touch-action:none; }
+  #knob { width:62px; height:62px; border-radius:50%;
+    background:rgba(255,255,255,.55); border:2px solid rgba(255,255,255,.9);
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); }
+  #jumpBtn { width:104px; height:104px; border-radius:50%; border:2px solid rgba(255,255,255,.85);
+    background:rgba(255,150,175,.45); display:flex; align-items:center; justify-content:center;
+    touch-action:none; cursor:pointer; }
+  #jumpBtn:active { background:rgba(255,150,175,.75); }
+  #jumpBtn svg { display:block; }
+  .ctlLabel { font-size:14px; padding:5px 18px; }
+
+  #finish { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(90,50,30,.35); z-index:20; }
+  #finishCard { background:#fff7ee; color:#7a4a2b; border-radius:24px; padding:28px 34px;
+    text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.25); max-width:84vw; }
+  #finishCard h1 { font-size:26px; margin-bottom:8px; }
+  #finishCard p { font-size:15px; margin-bottom:16px; }
+  #again { background:#ff9eb5; color:#fff; border:none; border-radius:999px;
+    padding:10px 26px; font-size:15px; font-weight:700; cursor:pointer; }
+  #hint { position:fixed; bottom:8px; left:0; right:0; text-align:center;
+    color:rgba(90,55,35,.75); font-size:12px; pointer-events:none; z-index:4; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="title" class="pill">CRUNCHEE · BUTTER PATH</div>
+  <div id="step" class="pill">STEP 0 / 10</div>
+</div>
+
+<div class="ctl" id="stickWrap">
+  <div id="stick"><div id="knob"></div></div>
+  <div class="pill ctlLabel">MOVE</div>
+</div>
+
+<div class="ctl" id="jumpWrap">
+  <div id="jumpBtn" aria-label="Jump">
+    <svg width="44" height="44" viewBox="0 0 24 24"><path d="M12 4 L21 13 L15.5 13 L15.5 20 L8.5 20 L8.5 13 L3 13 Z" fill="#ffffff"/></svg>
+  </div>
+  <div class="pill ctlLabel">JUMP</div>
+</div>
+
+<div id="finish"><div id="finishCard">
+  <h1>🧈 Butter Path Complete!</h1>
+  <p>You made it past all 10 wax butters.<br>Did you hear the crack grow?</p>
+  <button id="again">Play Again</button>
+</div></div>
+
+<div id="hint">Drag the joystick or use WASD / arrows · Space or JUMP to hop</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= renderer / scene / camera ================= */
+const container = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf9dfc8);
+scene.fog = new THREE.Fog(0xf9dfc8, 55, 110);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 300);
+
+const hemi = new THREE.HemisphereLight(0xfff4e0, 0xe8b48f, 0.95);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe3b3, 1.6);
+sun.position.set(-8, 18, -6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
+sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
+sun.shadow.camera.far = 60;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffe9d6, 0.35));
+
+/* ================= materials ================= */
+const MAT = {
+  floor:   new THREE.MeshStandardMaterial({ color:0xf3cfa9, roughness:0.95 }),
+  counter: new THREE.MeshStandardMaterial({ color:0xe9b48c, roughness:0.85 }),
+  pink:    new THREE.MeshStandardMaterial({ color:0xf6b8c6, roughness:0.7 }),
+  wood:    new THREE.MeshStandardMaterial({ color:0xc98d5f, roughness:0.85 }),
+  butter:  new THREE.MeshPhysicalMaterial({ color:0xffd94d, roughness:0.32, clearcoat:0.5, clearcoatRoughness:0.4 }),
+  plate:   new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.35 }),
+  start:   new THREE.MeshStandardMaterial({ color:0xfdf3e3, roughness:0.6 }),
+  cream:   new THREE.MeshPhysicalMaterial({ color:0xfff3d6, roughness:0.45, clearcoat:0.35 }),
+  caramel: new THREE.MeshPhysicalMaterial({ color:0xc97b2d, roughness:0.25, clearcoat:0.8, clearcoatRoughness:0.25 }),
+  white:   new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.5 }),
+  dark:    new THREE.MeshStandardMaterial({ color:0x3a2a20, roughness:0.4 }),
+  nose:    new THREE.MeshStandardMaterial({ color:0xff9eb5, roughness:0.4 }),
+  cake:    new THREE.MeshStandardMaterial({ color:0xfff6ea, roughness:0.55 }),
+  berry:   new THREE.MeshPhysicalMaterial({ color:0xe63b4e, roughness:0.3, clearcoat:0.6 }),
+};
+
+/* ================= bakery floor + simple decor ================= */
+const floor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.2, 90), MAT.floor);
+floor.position.set(0, -0.1, 24);
+floor.receiveShadow = true;
+scene.add(floor);
+
+// side counters with macarons / jars (cheap boxes + cylinders, alternating sides)
+const macColors = [0xf6a8c1, 0xa8d8b9, 0xffe28a, 0xc5a3e0, 0xffb37e];
+for (let i = 0; i < 9; i++) {
+  const z = 2 + i * 6;
+  for (const side of [-1, 1]) {
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 4.4), MAT.counter);
+    counter.position.set(side * 7.6, 0.55, z);
+    counter.castShadow = counter.receiveShadow = true;
+    scene.add(counter);
+    for (let j = 0; j < 3; j++) {
+      const mac = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.32, 0.32, 0.22, 20),
+        new THREE.MeshStandardMaterial({ color: macColors[(i + j) % macColors.length], roughness: 0.55 }));
+      mac.position.set(side * 7.6 + (j - 1) * 0.85, 1.22, z + (j % 2 ? 0.7 : -0.7));
+      mac.castShadow = true;
+      scene.add(mac);
+    }
+  }
+}
+
+/* ================= path: start platform, 10 butters, finish cake ================= */
+const BUTTER_W = 2.7, BUTTER_H = 0.72, BUTTER_D = 1.6, BUTTER_TOP = 0.92;
+const butters = [];   // {group, butterMesh, shell, x, z, layers, opacity, cracked, squish, squishV, baseTop}
+const pathX = i => Math.sin(i * 0.9) * 1.1;          // gentle winding
+const butterZ = i => 6 + i * 4.4;                    // i = 0..9
+
+// start platform (before butter 1)
+const startPlat = new THREE.Mesh(new THREE.BoxGeometry(3.4, BUTTER_TOP, 3.0), MAT.start);
+startPlat.position.set(0, BUTTER_TOP / 2, 0);
+startPlat.castShadow = startPlat.receiveShadow = true;
+scene.add(startPlat);
+
+function makeButter(i) {
+  const layers = i + 1;
+  const opacity = Math.min(0.75, 0.12 + (layers - 1) * 0.07); // butter always visible underneath
+  const g = new THREE.Group();
+  const x = pathX(i), z = butterZ(i);
+  g.position.set(x, 0, z);
+
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(BUTTER_W + 0.5, 0.2, BUTTER_D + 0.5), MAT.plate);
+  plate.position.y = 0.1;
+  plate.castShadow = plate.receiveShadow = true;
+  g.add(plate);
+
+  const butterMesh = new THREE.Mesh(new THREE.BoxGeometry(BUTTER_W, BUTTER_H, BUTTER_D), MAT.butter);
+  butterMesh.position.y = 0.2 + BUTTER_H / 2;
+  butterMesh.castShadow = butterMesh.receiveShadow = true;
+  g.add(butterMesh);
+
+  // translucent white wax shell, slightly larger than the butter
+  const shellMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, roughness: 0.5, transparent: true, opacity,
+    clearcoat: 0.25, depthWrite: false });
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(BUTTER_W + 0.1, BUTTER_H + 0.08, BUTTER_D + 0.1), shellMat);
+  shell.position.y = butterMesh.position.y + 0.02;
+  shell.castShadow = true;
+  g.add(shell);
+
+  scene.add(g);
+  butters.push({ group: g, butterMesh, shell, x, z, layers, opacity,
+                 cracked: false, squish: 0, squishV: 0, baseTop: BUTTER_TOP });
+}
+for (let i = 0; i < 10; i++) makeButter(i);
+
+// finish platform + cake (past butter 10)
+const FINISH_Z = butterZ(9) + 5.2;
+const finishPlat = new THREE.Mesh(new THREE.BoxGeometry(3.6, BUTTER_TOP, 3.2), MAT.pink);
+finishPlat.position.set(pathX(10), BUTTER_TOP / 2, FINISH_Z);
+finishPlat.castShadow = finishPlat.receiveShadow = true;
+scene.add(finishPlat);
+const cake = new THREE.Group();
+const cakeBase = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.55, 28), MAT.cake);
+cakeBase.castShadow = true; cake.add(cakeBase);
+const cakeTop = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.4, 28), MAT.pink);
+cakeTop.position.y = 0.47; cakeTop.castShadow = true; cake.add(cakeTop);
+const berry = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), MAT.berry);
+berry.position.y = 0.82; cake.add(berry);
+cake.position.set(pathX(10), BUTTER_TOP + 0.28, FINISH_Z);
+scene.add(cake);
+
+/* ================= bunny (spheres only) ================= */
+function sph(mat, r, x, y, z, sx = 1, sy = 1, sz = 1) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 18), mat);
+  m.position.set(x, y, z); m.scale.set(sx, sy, sz);
+  m.castShadow = true;
+  return m;
+}
+const bunny = new THREE.Group();
+const bBody = sph(MAT.cream, 0.52, 0, 0.52, 0, 1, 1.05, 0.92);
+const bHead = sph(MAT.cream, 0.44, 0, 1.22, 0.05);
+const bDrip = sph(MAT.caramel, 0.45, 0, 1.38, 0.05, 1, 0.62, 1);        // caramel top
+const bDrip2 = sph(MAT.caramel, 0.47, 0, 0.98, 0, 1, 0.5, 0.96);       // caramel band
+const earL = sph(MAT.caramel, 0.16, -0.34, 1.3, -0.02, 0.75, 2.1, 0.45);
+const earR = sph(MAT.caramel, 0.16,  0.34, 1.3, -0.02, 0.75, 2.1, 0.45);
+earL.rotation.z = 0.38; earR.rotation.z = -0.38;                        // floppy, hanging down
+const earLi = sph(MAT.cream, 0.11, -0.37, 1.26, 0.06, 0.7, 1.9, 0.4);
+const earRi = sph(MAT.cream, 0.11,  0.37, 1.26, 0.06, 0.7, 1.9, 0.4);
+earLi.rotation.z = 0.38; earRi.rotation.z = -0.38;
+const eyeL = sph(MAT.dark, 0.05, -0.16, 1.26, 0.45);
+const eyeR = sph(MAT.dark, 0.05,  0.16, 1.26, 0.45);
+const nose = sph(MAT.nose, 0.055, 0, 1.16, 0.47, 1, 0.75, 0.6);
+const blushL = sph(MAT.nose, 0.07, -0.27, 1.14, 0.4, 1, 0.7, 0.35);
+const blushR = sph(MAT.nose, 0.07,  0.27, 1.14, 0.4, 1, 0.7, 0.35);
+const tail = sph(MAT.white, 0.17, 0, 0.62, -0.48);
+const footL = sph(MAT.cream, 0.14, -0.22, 0.1, 0.18, 1, 0.6, 1.4);
+const footR = sph(MAT.cream, 0.14,  0.22, 0.1, 0.18, 1, 0.6, 1.4);
+bunny.add(bBody, bHead, bDrip, bDrip2, earL, earR, earLi, earRi, eyeL, eyeR,
+          nose, blushL, blushR, tail, footL, footR);
+scene.add(bunny);
+
+/* ================= audio: synthesized wax crack (WebAudio) ================= */
+let actx = null;
+function audio() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function noiseBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+function crackSound(layers) {
+  try {
+    const ctx = audio();
+    const t0 = ctx.currentTime;
+    const L = layers;
+    const burstCount = 1 + Math.min(4, Math.ceil(L / 3));       // more layers = more staggered cracks
+    const baseDur = 0.07 + L * 0.022;                           // longer
+    const baseFreq = 2100 - L * 130;                            // lower / bigger
+    for (let k = 0; k < burstCount; k++) {
+      const dur = baseDur * (1 - k * 0.1);
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(ctx, dur + 0.02);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = Math.max(500, baseFreq - k * 160);
+      bp.Q.value = 0.9;
+      const g = ctx.createGain();
+      const peak = Math.min(0.85, 0.3 + L * 0.05) * (1 - k * 0.14);
+      const start = t0 + k * 0.05;
+      g.gain.setValueAtTime(peak, start);
+      g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+      src.start(start); src.stop(start + dur + 0.03);
+    }
+    // soft buttery squish underneath the crack
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(160, t0);
+    o.frequency.exponentialRampToValueAtTime(70, t0 + 0.14);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.12, t0);
+    og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    o.connect(og); og.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + 0.18);
+  } catch (e) { /* audio is a bonus layer; never let it break the game */ }
+}
+
+/* ================= wax flakes ================= */
+const flakes = [];
+const flakeGeo = new THREE.BoxGeometry(0.14, 0.03, 0.11);
+const flakeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, transparent: true });
+function spawnFlakes(b, count) {
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(flakeGeo, flakeMat.clone());
+    m.position.set(b.x + (Math.random() - 0.5) * BUTTER_W,
+                   b.baseTop + 0.1,
+                   b.z + (Math.random() - 0.5) * BUTTER_D);
+    m.castShadow = true;
+    scene.add(m);
+    flakes.push({ m,
+      vx: (Math.random() - 0.5) * 2.4, vy: 2 + Math.random() * 2.2, vz: (Math.random() - 0.5) * 2.4,
+      rx: (Math.random() - 0.5) * 9, rz: (Math.random() - 0.5) * 9, life: 0 });
+  }
+}
+
+/* ================= player state / physics ================= */
+const player = {
+  pos: new THREE.Vector3(0, BUTTER_TOP, 0),
+  vy: 0, grounded: true, facing: 0, squash: 0, squashV: 0, sinkDip: 0,
+};
+let stepCount = 0, finished = false;
+const stepEl = document.getElementById('step');
+const finishEl = document.getElementById('finish');
+
+function supportAt(x, z) {
+  // returns {top, butter|null} for the highest platform under x,z (floor = 0)
+  let top = 0, hit = null;
+  if (Math.abs(x) <= 1.7 && Math.abs(z) <= 1.5) top = BUTTER_TOP;                       // start
+  if (Math.abs(x - pathX(10)) <= 1.8 && Math.abs(z - FINISH_Z) <= 1.6) top = BUTTER_TOP; // finish
+  for (const b of butters) {
+    if (Math.abs(x - b.x) <= BUTTER_W / 2 + 0.12 && Math.abs(z - b.z) <= BUTTER_D / 2 + 0.12) {
+      const t = b.baseTop - BUTTER_H * 0.42 * b.squish;   // sinking into compressed butter
+      if (t >= top) { top = t; hit = b; }
+    }
+  }
+  return { top, butter: hit };
+}
+
+function landOnButter(b) {
+  b.squish = 1; b.squishV = 0;                    // deep compression -> the sink
+  player.squash = 0.4; player.squashV = 0;
+  if (!b.cracked) {
+    b.cracked = true;
+    b.shell.visible = false;                      // shell shatters away
+    spawnFlakes(b, 6 + b.layers * 3);             // more layers = more flakes
+    crackSound(b.layers);
+    stepCount++;
+    stepEl.textContent = 'STEP ' + stepCount + ' / 10';
+  } else {
+    b.squish = 0.55;                              // re-step on cracked butter: softer squish, no new crack
+  }
+}
+
+/* ================= input: joystick + jump button + keys ================= */
+const input = { x: 0, z: 0 };
+const keys = {};
+let jumpQueued = false;
+
+const stick = document.getElementById('stick');
+const knob = document.getElementById('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stick.getBoundingClientRect();
+  let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+  let dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+  const len = Math.hypot(dx, dy);
+  if (len > 1) { dx /= len; dy /= len; }
+  input.x = dx; input.z = -dy;                    // push up = forward along the path
+  knob.style.transform = 'translate(calc(-50% + ' + (dx * 34) + 'px), calc(-50% + ' + (dy * 34) + 'px))';
+}
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(stickId); stickMove(e); audio(); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+function stickEnd(e) {
+  if (e.pointerId !== stickId) return;
+  stickId = null; input.x = 0; input.z = 0;
+  knob.style.transform = 'translate(-50%,-50%)';
+}
+stick.addEventListener('pointerup', stickEnd);
+stick.addEventListener('pointercancel', stickEnd);
+
+const jumpBtn = document.getElementById('jumpBtn');
+jumpBtn.addEventListener('pointerdown', e => { e.preventDefault(); jumpQueued = true; audio(); });
+
+window.addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === ' ') jumpQueued = true;
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+document.getElementById('again').addEventListener('click', () => location.reload());
+
+function readKeyboard() {
+  let x = 0, z = 0;
+  if (keys['a'] || keys['arrowleft']) x -= 1;
+  if (keys['d'] || keys['arrowright']) x += 1;
+  if (keys['w'] || keys['arrowup']) z += 1;
+  if (keys['s'] || keys['arrowdown']) z -= 1;
+  return { x, z };
+}
+
+/* ================= main loop ================= */
+const SPEED = 5.2, JUMP_V = 9.2, GRAV = -24;
+const clock = new THREE.Clock();
+const camTarget = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // butter squish springs (drives both the mesh squash and the sink)
+  for (const b of butters) {
+    if (b.squish > 0.001 || Math.abs(b.squishV) > 0.001) {
+      const acc = -110 * b.squish - 9 * b.squishV;
+      b.squishV += acc * dt;
+      b.squish = Math.max(0, b.squish + b.squishV * dt);
+      const sy = 1 - 0.42 * b.squish;
+      b.butterMesh.scale.set(1 + 0.18 * b.squish, sy, 1 + 0.18 * b.squish);
+      b.butterMesh.position.y = 0.2 + (BUTTER_H * sy) / 2;
+      if (!b.cracked) { b.shell.scale.copy(b.butterMesh.scale); b.shell.position.y = b.butterMesh.position.y + 0.02; }
+    }
+  }
+
+  // flakes fall + fade
+  for (let i = flakes.length - 1; i >= 0; i--) {
+    const f = flakes[i];
+    f.life += dt;
+    f.vy -= 7 * dt;
+    f.m.position.x += f.vx * dt; f.m.position.y += f.vy * dt; f.m.position.z += f.vz * dt;
+    f.m.rotation.x += f.rx * dt; f.m.rotation.z += f.rz * dt;
+    if (f.m.position.y < 0.04) { f.m.position.y = 0.04; f.vy = 0; f.vx = f.vz = 0; }
+    if (f.life > 1.4) f.m.material.opacity = Math.max(0, 1 - (f.life - 1.4) / 0.5);
+    if (f.life > 1.9) { scene.remove(f.m); f.m.material.dispose(); flakes.splice(i, 1); }
+  }
+
+  // player movement
+  const kb = readKeyboard();
+  const mx = THREE.MathUtils.clamp(input.x + kb.x, -1, 1);
+  const mz = THREE.MathUtils.clamp(input.z + kb.z, -1, 1);
+  const prevX = player.pos.x, prevZ = player.pos.z;
+  player.pos.x += mx * SPEED * dt;
+  player.pos.z += mz * SPEED * dt;
+  player.pos.x = THREE.MathUtils.clamp(player.pos.x, -5.6, 5.6);
+  player.pos.z = THREE.MathUtils.clamp(player.pos.z, -2.2, FINISH_Z + 2.2);
+  if (Math.hypot(mx, mz) > 0.12) {
+    const targetFacing = Math.atan2(mx, mz);
+    let d = targetFacing - player.facing;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    player.facing += d * Math.min(1, 14 * dt);
+  }
+
+  // jump / gravity / landing
+  const wasGrounded = player.grounded;
+  const fallSpeed = player.vy;
+  if (player.grounded && jumpQueued) {
+    player.vy = JUMP_V;
+    player.grounded = false;
+    player.squash = -0.22; player.squashV = 0;
+  }
+  jumpQueued = false;
+  if (!player.grounded || player.vy > 0) player.vy += GRAV * dt;
+  player.pos.y += player.vy * dt;
+
+  let sup = supportAt(player.pos.x, player.pos.z);
+  // walking on the ground into the side of a raised platform: blocked, you have to jump up
+  if (wasGrounded && sup.top > player.pos.y + 0.3) {
+    player.pos.x = prevX; player.pos.z = prevZ;
+    sup = supportAt(player.pos.x, player.pos.z);
+  }
+  if (player.pos.y <= sup.top) {
+    player.pos.y = sup.top;
+    if (!wasGrounded && fallSpeed < -2 && sup.butter) landOnButter(sup.butter);
+    else if (!wasGrounded && fallSpeed < -2) { player.squash = 0.3; player.squashV = 0; }
+    player.vy = 0;
+    player.grounded = true;
+    // finish: standing on the cake platform past butter 10
+    if (!finished && Math.abs(player.pos.z - FINISH_Z) <= 1.6 &&
+        Math.abs(player.pos.x - pathX(10)) <= 1.8) {
+      finished = true;
+      finishEl.style.display = 'flex';
+    }
+  } else if (player.pos.y > sup.top + 0.02) {
+    player.grounded = false;
+  }
+  // while standing on a squishing butter, ride its sinking top
+  if (player.grounded) {
+    const s2 = supportAt(player.pos.x, player.pos.z);
+    player.pos.y = s2.top;
+  }
+
+  // bunny transform + squash spring + ear flop
+  const sAcc = -150 * player.squash - 11 * player.squashV;
+  player.squashV += sAcc * dt;
+  player.squash += player.squashV * dt;
+  const sq = THREE.MathUtils.clamp(player.squash, -0.35, 0.55);
+  bunny.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5);
+  bunny.position.copy(player.pos);
+  bunny.rotation.y = player.facing;
+  const flop = Math.sin(clock.elapsedTime * 5) * 0.05 + Math.abs(player.vy) * 0.012;
+  earL.rotation.z = 0.38 + flop; earR.rotation.z = -0.38 - flop;
+  earLi.rotation.z = earL.rotation.z; earRi.rotation.z = earR.rotation.z;
+  cake.rotation.y += dt * 0.6;
+
+  // bird's-eye-ish camera: ~55 degrees, behind (-z) and above, looking ahead up the path
+  camTarget.set(player.pos.x * 0.72, player.pos.y, player.pos.z);
+  const desired = new THREE.Vector3(camTarget.x, camTarget.y + 9.2, camTarget.z - 6.4);
+  camera.position.lerp(desired, 1 - Math.exp(-5 * dt));
+  camera.lookAt(camTarget.x, camTarget.y + 0.4, camTarget.z + 2.2);
+  sun.position.set(player.pos.x - 8, 18, player.pos.z - 6);
+  sun.target.position.set(player.pos.x, 0, player.pos.z);
+  sun.target.updateMatrixWorld();
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
