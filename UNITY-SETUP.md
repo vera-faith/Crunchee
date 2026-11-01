@@ -8,9 +8,17 @@ Unity (open the project, build the scene, press Play, fix errors) remotely.
 
 1. **Download Unity Hub** — https://unity.com/download → install the .dmg
    (drag Unity Hub into Applications, open it).
-2. **Sign in / create a Unity ID** inside Hub (free Personal license is fine;
-   activate it when Hub asks — Personal → "I don't use Unity in a professional
-   capacity" if it asks for revenue details).
+2. **Sign in / create a Unity ID** inside Hub.
+   - **Best: get the free Unity Student plan first** — unity.com/products/unity-student
+     → sign in → verify enrollment through SheerID (UCSD counts, 16+). It's free,
+     gives the **Unity Pro** editor for 1 year (renewable while enrolled) plus
+     bonus assets/tools, and covers commercial release under a $1M threshold for
+     solo student projects. Unity emails a license key; add it in Hub
+     (Settings → Licenses → Add).
+   - Fallback: the free Personal license is fine to start (activate it when Hub
+     asks — Personal → "I don't use Unity in a professional capacity" if it asks
+     for revenue details). You can switch to the Student/Pro license later
+     without reinstalling.
 3. **Install an editor** — Hub → Installs → Install Editor → pick the current
    **Unity 6 LTS** (or 2022.3 LTS). On the modules screen, also tick:
    - **iOS Build Support** (needed later for TestFlight)
