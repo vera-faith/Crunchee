@@ -69,7 +69,7 @@ namespace Crunchee.Core
             {
                 var main = stepParticles.main;
                 if (coating == Coating.Wax) stepParticles.Emit(6 + waxLayers * 4);
-                else stepParticles.Play();
+                else stepParticles.Emit(14);
             }
 
             // 5. Haptic (mobile)
