@@ -63,6 +63,14 @@ namespace Crunchee.Audio
             }
         }
 
+        /// <summary>Soft re-land on an already-cracked squishy: just the quiet base thud.</summary>
+        public static void PlaySoftBase(Vector3 pos)
+        {
+            if (Instance == null) return;
+            var clip = Instance.Synth("butter", () => AsmrSynth.ButterBase(Random.Range(1, 99999)));
+            Instance.PlayOne(Instance.baseSource, clip, Random.Range(0.95f, 1.02f), 0.3f);
+        }
+
         AudioClip SynthCoating(Coating c)
         {
             int v = Random.Range(0, 3); // a few cached variants per coating

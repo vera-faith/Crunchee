@@ -5,9 +5,11 @@ using Crunchee.UI;
 namespace Crunchee.Player
 {
     /// <summary>
-    /// M1 greybox controller: drag = move relative to camera, tap (quick touch / Space in editor) = jump.
-    /// Landing on a Squishy triggers its pipeline and applies its bounce.
-    /// Character model itself is a child object so SquashAndStretch can deform it freely.
+    /// Faith's traversal model (from the reference videos): the character WALKS
+    /// from squishy to squishy. First touch on a squishy = its one landing
+    /// (crack + sound), then the character rides it down as it slowly sinks -
+    /// no bounce, no repeated jumping on items. The JUMP button still exists
+    /// for gaps and fun hops, it just isn't how squishies are farmed.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
@@ -21,8 +23,15 @@ namespace Crunchee.Player
         Vector3 velocity;
         SquashAndStretch squash;
         Vector2 dragInput;
+        Squishy groundSquishy;
+        bool wasGrounded;
 
-        void Awake() { cc = GetComponent<CharacterController>(); squash = GetComponentInChildren<SquashAndStretch>(); }
+        void Awake()
+        {
+            cc = GetComponent<CharacterController>();
+            cc.stepOffset = 0.55f; // tall enough to walk up onto the next squishy in the climb
+            squash = GetComponentInChildren<SquashAndStretch>();
+        }
 
         void Update()
         {
@@ -33,26 +42,51 @@ namespace Crunchee.Player
 
             bool grounded = cc.isGrounded;
             if (grounded && velocity.y < 0f) velocity.y = -2f;
-            if (grounded && JumpPressed()) { velocity.y = jumpForce; squash?.OnJump(); }
+            bool jumping = false;
+            if (grounded && JumpPressed())
+            {
+                velocity.y = jumpForce; squash?.OnJump(); jumping = true;
+                ReleaseSquishy();
+            }
 
             velocity.y += gravity * Time.deltaTime;
-            Vector3 delta = (move + velocity) * Time.deltaTime;
-            var flags = cc.Move(delta);
+            cc.Move((move + velocity) * Time.deltaTime);
 
-            if ((flags & CollisionFlags.Below) != 0 && velocity.y <= 0f) CheckSquishLanding();
+            if (!jumping) UpdateSquishyContact();
             if (move.sqrMagnitude > 0.01f) transform.forward = Vector3.Slerp(transform.forward, move.normalized, 12f * Time.deltaTime);
+            wasGrounded = cc.isGrounded;
         }
 
-        void CheckSquishLanding()
+        void ReleaseSquishy()
         {
-            if (Physics.Raycast(transform.position + Vector3.up * 0.2f, Vector3.down, out var hit, 0.6f))
+            if (groundSquishy != null) { groundSquishy.SetOccupied(false); groundSquishy = null; }
+        }
+
+        void UpdateSquishyContact()
+        {
+            Squishy sq = null;
+            if (cc.isGrounded && velocity.y <= 0.5f &&
+                Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, out var hit, 0.85f))
+                sq = hit.collider.GetComponent<Squishy>();
+
+            if (sq != groundSquishy)
             {
-                var s = hit.collider.GetComponent<Squishy>();
-                if (s != null)
+                ReleaseSquishy();
+                groundSquishy = sq;
+                if (sq != null)
                 {
-                    velocity.y = s.OnStepped(Mathf.Abs(velocity.y));
-                    squash?.OnLand();
+                    sq.SetOccupied(true);
+                    sq.OnLanded(Mathf.Abs(velocity.y));
+                    if (!wasGrounded) squash?.OnLand();
                 }
+            }
+
+            // Ride the surface: as the squishy sinks (or recovers), stay glued to its top.
+            if (groundSquishy != null && cc.isGrounded)
+            {
+                float delta = groundSquishy.TopY - transform.position.y;
+                if (Mathf.Abs(delta) > 0.001f && Mathf.Abs(delta) < 0.6f)
+                    cc.Move(new Vector3(0f, delta, 0f));
             }
         }
 

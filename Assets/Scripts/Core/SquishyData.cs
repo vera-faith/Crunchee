@@ -31,6 +31,7 @@ namespace Crunchee.Core
         public static SquishProfile DefaultFor(BaseMaterial b, Coating c)
         {
             var p = new SquishProfile { squishDepth = 0.35f, springBack = 0.45f, bounceForce = 8f, hapticStrength = 0.4f, stickyRelease = false };
+            if (b == BaseMaterial.Butter) { p.squishDepth = 0.5f; p.bounceForce = 0f; } // Butter Path: deep slow sink, no bounce
             if (b == BaseMaterial.CakeSponge || b == BaseMaterial.Mochi) { p.squishDepth = 0.5f; p.hapticStrength = 0.25f; }
             if (b == BaseMaterial.KeyboardKey) { p.squishDepth = 0.18f; p.springBack = 0.18f; p.bounceForce = 3f; p.hapticStrength = 0.6f; }
             if (b == BaseMaterial.Chocolate || b == BaseMaterial.Macaron) { p.squishDepth = 0.15f; p.hapticStrength = 0.7f; }

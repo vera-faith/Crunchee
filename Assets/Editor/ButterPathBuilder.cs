@@ -14,18 +14,20 @@ namespace Crunchee.EditorTools
 {
     /// <summary>
     /// One-click map build. Menu: Crunchee > Build Butter Path Scene
-    /// Bakery map layout (one long path, Faith's design):
+    /// Bakery map (Faith's design + reference videos): ONE long path of GIANT
+    /// butters the character walks across. One land per squishy -> coating
+    /// cracks -> character slowly sinks in.
     ///   start platform
-    ///   -> 10 WAX butters, layers 1..10, LOW-OPACITY wax (alpha 0.12/layer, capped 0.75)
-    ///   -> 4 SUGAR butters (sparkly shell, crunch)
-    ///   -> 4 HONEY butters (glossy amber shell, sticky pull)
-    ///   -> 4 NAIL POLISH butters (glossy pastel shells, hard tap)
-    ///   -> finish platform, Pudding Bunny player, bakery dressing,
+    ///   -> 10 WAX butters, layers 1..10, LOW-OPACITY wax (alpha 0.12/layer, capped 0.75),
+    ///      shell built as 4 pieces so it can visibly split open
+    ///   -> 4 SUGAR, 4 HONEY, 4 NAIL POLISH (polish shells crack too)
+    ///   -> finish platform, Pudding Bunny, bakery dressing, warm fog + pendants,
     ///      bird's-eye camera, joystick + JUMP UI.
     /// </summary>
     public static class ButterPathBuilder
     {
-        const float ButterW = 2.6f, ButterH = 0.7f, ButterD = 1.6f;
+        const float ButterW = 3.2f, ButterH = 0.7f, ButterD = 2.0f, PatH = 0.14f;
+        const float StepAdvance = ButterD + 0.18f; // edges nearly touch: walk straight across
 
         static Material Mat(string name, Color c, float alpha = 1f, float smoothness = 0.35f)
         {
@@ -41,10 +43,28 @@ namespace Crunchee.EditorTools
             return m;
         }
 
+        static Material EmissiveMat(string name, Color c, float intensity)
+        {
+            var m = Mat(name, c, 1f, 0.4f);
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", c * intensity);
+            return m;
+        }
+
         [MenuItem("Crunchee/Build Butter Path Scene")]
         public static void Build()
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // --- Atmosphere: warm cream backdrop + distance fog (sunset bakery) ---
+            var bg = new Color(0.99f, 0.9f, 0.84f);
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = bg;
+            RenderSettings.fogStartDistance = 42f;
+            RenderSettings.fogEndDistance = 115f;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.6f, 0.56f, 0.52f);
 
             // --- Lighting: warm bakery sun ---
             var sun = new GameObject("Sun").AddComponent<Light>();
@@ -53,39 +73,38 @@ namespace Crunchee.EditorTools
             sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             sun.shadows = LightShadows.Soft;
 
-            // --- Floor: cream/pink checker counter top ---
+            // --- Floor: big cream/pink checker tiles like the reference room ---
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.name = "BakeryFloor"; floor.transform.localScale = new Vector3(4f, 1f, 14f);
-            floor.transform.position = new Vector3(0f, -0.06f, 30f);
-            var floorMat = Mat("Floor", Color.white);
+            floor.transform.position = new Vector3(0f, -0.06f, 26f);
+            var floorMat = Mat("Floor", Color.white, 1f, 0.3f);
             floorMat.mainTexture = CheckerTexture();
-            floorMat.mainTextureScale = new Vector2(8f, 30f);
+            floorMat.mainTextureScale = new Vector2(6f, 22f);
             floor.GetComponent<MeshRenderer>().material = floorMat;
 
-            var butterMat = Mat("Butter", new Color(1f, 0.85f, 0.35f), 1f, 0.45f);
+            var butterMat = Mat("Butter", new Color(1f, 0.85f, 0.35f), 1f, 0.6f);
+            var patMat = Mat("ButterPat", new Color(1f, 0.89f, 0.45f), 1f, 0.65f);
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
 
             // --- Start platform ---
             Vector3 pos = Vector3.zero;
-            var start = Box("StartPlatform", pos, new Vector3(3.4f, 0.4f, 3.4f), platformMat);
+            var start = Box("StartPlatform", pos, new Vector3(4f, 0.4f, 4f), platformMat);
 
-            // --- The path: wax 1..10, then sugar / honey / nail-polish stretches ---
-            int stepNo = 0;
+            // --- The path ---
             foreach (var s in LevelPath.ButterPath())
             {
-                pos += new Vector3(s.sideOffset, s.heightOffset, ButterD + s.gap * 0.55f);
-                BuildButter(pos, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat);
-                stepNo++;
+                pos += new Vector3(s.sideOffset, s.heightOffset, StepAdvance);
+                BuildButter(pos, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat, patMat);
             }
             for (int i = 1; i <= 4; i++)
             {
-                pos += new Vector3(0f, 0.35f, ButterD + 1.21f);
-                BuildButter(pos, $"Butter_Sugar_{i}", Coating.Sugar, 1, butterMat);
+                pos += new Vector3(0f, 0.35f, StepAdvance);
+                BuildButter(pos, $"Butter_Sugar_{i}", Coating.Sugar, 1, butterMat, patMat);
             }
             for (int i = 1; i <= 4; i++)
             {
-                pos += new Vector3(0f, 0.35f, ButterD + 1.21f);
-                BuildButter(pos, $"Butter_Honey_{i}", Coating.Honey, 1, butterMat);
+                pos += new Vector3(0f, 0.35f, StepAdvance);
+                BuildButter(pos, $"Butter_Honey_{i}", Coating.Honey, 1, butterMat, patMat);
             }
             var polishColors = new[]
             {
@@ -96,13 +115,13 @@ namespace Crunchee.EditorTools
             };
             for (int i = 1; i <= 4; i++)
             {
-                pos += new Vector3(0f, 0.35f, ButterD + 1.21f);
-                BuildButter(pos, $"Butter_NailPolish_{i}", Coating.NailPolish, 1, butterMat, polishColors[i - 1]);
+                pos += new Vector3(0f, 0.35f, StepAdvance);
+                BuildButter(pos, $"Butter_NailPolish_{i}", Coating.NailPolish, 1, butterMat, patMat, polishColors[i - 1]);
             }
 
-            // --- Finish platform + bakery back wall ---
-            pos += new Vector3(0f, 0.35f, 3.2f);
-            var finish = Box("FinishPlatform", pos, new Vector3(3.6f, 0.4f, 3.6f), platformMat);
+            // --- Finish platform + dressing ---
+            pos += new Vector3(0f, 0.35f, 3.4f);
+            var finish = Box("FinishPlatform", pos, new Vector3(4.2f, 0.4f, 4.2f), platformMat);
             finish.AddComponent<FinishTrigger>();
             BuildBakeryDressing(pos);
 
@@ -110,9 +129,12 @@ namespace Crunchee.EditorTools
             var player = BuildPuddingBunny(new Vector3(0f, 1.0f, 0f));
             var pc = player.GetComponent<PlayerController>();
 
-            // --- Camera: bird's-eye-ish follow ---
+            // --- Camera: bird's-eye-ish follow over the cream backdrop ---
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
-            camGo.AddComponent<Camera>(); camGo.AddComponent<AudioListener>();
+            var cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = bg;
+            camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
             pc.cameraRig = camGo.transform;
@@ -120,7 +142,7 @@ namespace Crunchee.EditorTools
             // --- Audio root ---
             var audio = new GameObject("AsmrAudio"); audio.AddComponent<AsmrAudio>();
 
-            // --- UI: joystick bottom-left + JUMP bottom-right (labels BELOW buttons) ---
+            // --- UI ---
             BuildUI(player);
 
             if (!AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.CreateFolder("Assets", "Scenes");
@@ -128,33 +150,63 @@ namespace Crunchee.EditorTools
             Debug.Log("[Crunchee] Butter Path scene built: Assets/Scenes/ButterPath.unity — press Play.");
         }
 
-        /// <summary>One butter step with its coating shell + particles + Squishy wiring.</summary>
-        static void BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Color polishColor = default)
+        /// <summary>One giant butter step: body + pat top + coating shell + particles + Squishy.</summary>
+        static void BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, Color polishColor = default)
         {
             var step = Box(name, pos, new Vector3(ButterW, ButterH, ButterD), butterMat);
 
-            Material shellMat; Color particleColor; string shellName;
+            // Butter pat: the thinner slab on top of a real butter stick.
+            var pat = Box("Pat", pos + new Vector3(0f, ButterH / 2f + PatH / 2f, 0f),
+                          new Vector3(ButterW * 0.94f, PatH, ButterD * 0.92f), patMat);
+            pat.transform.SetParent(step.transform, true);
+            Object.DestroyImmediate(pat.GetComponent<Collider>());
+
+            // Collider reaches the pat top so the player stands on the pat/shell.
+            var col = step.GetComponent<BoxCollider>();
+            col.size = new Vector3(1f, (ButterH + PatH) / ButterH, 1f);
+            col.center = new Vector3(0f, (PatH / 2f) / ButterH, 0f);
+
+            Material shellMat; Color particleColor; string shellName; bool crackable;
             switch (coating)
             {
                 case Coating.Sugar:
                     shellMat = Mat("SugarShell", new Color(1f, 0.93f, 0.95f), 0.88f, 0.9f);
-                    particleColor = new Color(1f, 0.8f, 0.88f); shellName = "SugarShell"; break;
+                    particleColor = new Color(1f, 0.8f, 0.88f); shellName = "SugarShell"; crackable = false; break;
                 case Coating.Honey:
                     shellMat = Mat("HoneyShell", new Color(1f, 0.62f, 0.12f), 0.5f, 1f);
-                    particleColor = new Color(1f, 0.7f, 0.25f); shellName = "HoneyShell"; break;
+                    particleColor = new Color(1f, 0.7f, 0.25f); shellName = "HoneyShell"; crackable = false; break;
                 case Coating.NailPolish:
                     shellMat = Mat("PolishShell", polishColor == default ? new Color(1f, 0.62f, 0.72f) : polishColor, 1f, 1f);
-                    particleColor = shellMat.color; shellName = "PolishShell"; break;
+                    particleColor = shellMat.color; shellName = "PolishShell"; crackable = true; break;
                 default: // Wax: low-opacity build-up, butter always shows through
                     float alpha = Mathf.Min(0.75f, 0.12f * waxLayers);
                     shellMat = Mat($"Wax{waxLayers}", Color.white, alpha, 0.55f);
-                    particleColor = Color.white; shellName = "WaxShell"; break;
+                    particleColor = Color.white; shellName = "WaxShell"; crackable = true; break;
             }
 
-            var shell = Box(shellName, pos + new Vector3(0f, ButterH * 0.28f, 0f),
-                            new Vector3(ButterW * 1.03f, ButterH * 0.55f, ButterD * 1.03f), shellMat);
+            // Shell group sits on the pat. Wax/polish = 4 quadrant pieces (they split
+            // apart on the first landing); sugar/honey = one soft piece.
+            var shell = new GameObject(shellName);
+            shell.transform.position = pos + new Vector3(0f, ButterH / 2f + PatH + ButterH * 0.2f, 0f);
             shell.transform.SetParent(step.transform, true);
-            Object.DestroyImmediate(shell.GetComponent<Collider>());
+            float shellW = ButterW * 1.02f, shellD = ButterD * 1.02f, shellH = ButterH * 0.5f;
+            if (crackable)
+            {
+                foreach (var sx in new[] { -1f, 1f })
+                    foreach (var sz in new[] { -1f, 1f })
+                    {
+                        var piece = Box("ShellPiece", shell.transform.position + new Vector3(sx * shellW / 4f, 0f, sz * shellD / 4f),
+                                        new Vector3(shellW / 2f - 0.045f, shellH, shellD / 2f - 0.045f), shellMat);
+                        piece.transform.SetParent(shell.transform, true);
+                        Object.DestroyImmediate(piece.GetComponent<Collider>());
+                    }
+            }
+            else
+            {
+                var piece = Box("Shell", shell.transform.position, new Vector3(shellW, shellH, shellD), shellMat);
+                piece.transform.SetParent(shell.transform, true);
+                Object.DestroyImmediate(piece.GetComponent<Collider>());
+            }
 
             var sq = step.AddComponent<Squishy>();
             sq.baseMaterial = BaseMaterial.Butter; sq.coating = coating; sq.waxLayers = waxLayers;
@@ -172,7 +224,6 @@ namespace Crunchee.EditorTools
         /// <summary>
         /// Pudding Bunny (locked character): glossy caramel flan body, caramel drip cap,
         /// floppy ears, simple cute face. Built from primitives until the model lands.
-        /// Visuals hang off "Model" so SquashAndStretch can deform them.
         /// </summary>
         static GameObject BuildPuddingBunny(Vector3 at)
         {
@@ -188,13 +239,10 @@ namespace Crunchee.EditorTools
             var model = new GameObject("Model"); model.transform.SetParent(player.transform, false);
             model.AddComponent<SquashAndStretch>();
 
-            // Body: plump flan
             var body = Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.52f, 0f), new Vector3(0.66f, 0.6f, 0.62f), pudding);
-            // Caramel drip cap: squashed glossy dome + drips at the rim
             Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 0.78f, 0f), new Vector3(0.7f, 0.3f, 0.66f), caramel);
             foreach (var dx in new[] { -0.24f, 0f, 0.24f })
                 Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(dx, 0.66f, 0.26f), new Vector3(0.09f, 0.2f, 0.09f), caramel);
-            // Floppy ears: flop down-back, caramel tips
             foreach (var side in new[] { -1f, 1f })
             {
                 var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.2f, 0.78f, -0.06f), new Vector3(0.15f, 0.44f, 0.07f), pudding);
@@ -202,16 +250,13 @@ namespace Crunchee.EditorTools
                 var tip = Part(PrimitiveType.Sphere, model.transform, "EarTip", new Vector3(side * 0.31f, 0.52f, -0.18f), new Vector3(0.13f, 0.16f, 0.06f), caramel);
                 tip.transform.rotation = ear.transform.rotation;
             }
-            // Face: round eyes, tiny nose, blush - the locked cute face
             foreach (var side in new[] { -1f, 1f })
             {
                 Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.13f, 0.58f, 0.29f), new Vector3(0.07f, 0.09f, 0.04f), dark);
                 Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.24f, 0.48f, 0.27f), new Vector3(0.09f, 0.05f, 0.03f), pink);
-                // Feet
                 Part(PrimitiveType.Sphere, model.transform, "Foot", new Vector3(side * 0.16f, 0.06f, 0.16f), new Vector3(0.2f, 0.1f, 0.3f), pudding);
             }
             Part(PrimitiveType.Sphere, model.transform, "Nose", new Vector3(0f, 0.52f, 0.31f), new Vector3(0.06f, 0.045f, 0.03f), pink);
-            // Tail puff
             Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.34f, -0.3f), new Vector3(0.18f, 0.18f, 0.18f), pudding);
             return player;
         }
@@ -226,15 +271,18 @@ namespace Crunchee.EditorTools
             return go;
         }
 
-        /// <summary>Bakery dressing: counters flanking the path, cake stands, back wall + bunting.</summary>
+        /// <summary>Bakery dressing: counters + cake stands, pendant lights, back wall, awning, bunting.</summary>
         static void BuildBakeryDressing(Vector3 finishPos)
         {
             var wood = Mat("Counter", new Color(0.87f, 0.64f, 0.47f), 1f, 0.4f);
+            var woodTop = Mat("CounterTop", new Color(0.97f, 0.88f, 0.76f), 1f, 0.55f);
+            var ribbon = Mat("Ribbon", new Color(0.96f, 0.55f, 0.66f), 1f, 0.5f);
             float pathLen = finishPos.z;
             foreach (var side in new[] { -1f, 1f })
             {
-                var counter = Box("Counter", new Vector3(side * 3.6f, 0.42f, pathLen * 0.5f), new Vector3(1.3f, 0.9f, pathLen + 8f), wood);
-                counter.GetComponent<Collider>().enabled = true;
+                Box("Counter", new Vector3(side * 3.9f, 0.42f, pathLen * 0.5f), new Vector3(1.3f, 0.9f, pathLen + 8f), wood);
+                Box("CounterTop", new Vector3(side * 3.9f, 0.93f, pathLen * 0.5f), new Vector3(1.5f, 0.08f, pathLen + 8f), woodTop);
+                Box("Ribbon", new Vector3(side * 3.22f, 0.62f, pathLen * 0.5f), new Vector3(0.05f, 0.16f, pathLen + 8f), ribbon);
             }
             var cakeMats = new[]
             {
@@ -248,20 +296,37 @@ namespace Crunchee.EditorTools
             int k = 0;
             for (float z = 5f; z < pathLen; z += 6.5f, k++)
             {
-                float side = (k % 2 == 0) ? -3.6f : 3.6f;
-                var g = new GameObject("CakeStand"); g.transform.position = new Vector3(side, 0.9f, z);
+                float side = (k % 2 == 0) ? -3.9f : 3.9f;
+                var g = new GameObject("CakeStand"); g.transform.position = new Vector3(side, 0.97f, z);
                 Part(PrimitiveType.Cylinder, g.transform, "Stem", new Vector3(0f, 0.16f, 0f), new Vector3(0.12f, 0.32f, 0.12f), standMat);
                 Part(PrimitiveType.Cylinder, g.transform, "Plate", new Vector3(0f, 0.34f, 0f), new Vector3(0.95f, 0.05f, 0.95f), standMat);
                 Part(PrimitiveType.Cylinder, g.transform, "Cake", new Vector3(0f, 0.48f, 0f), new Vector3(0.68f, 0.24f, 0.68f), cakeMats[k % cakeMats.Length]);
                 Part(PrimitiveType.Sphere, g.transform, "Cherry", new Vector3(0f, 0.66f, 0f), new Vector3(0.13f, 0.13f, 0.13f), cherryMat);
             }
-            // Back wall behind the finish + bunting row
+            // Pendant lights down the middle of the path
+            var cordMat = Mat("Cord", new Color(0.35f, 0.25f, 0.2f), 1f, 0.4f);
+            var bulbMat = EmissiveMat("Bulb", new Color(1f, 0.78f, 0.5f), 1.6f);
+            for (float z = 9f; z < pathLen; z += 11f)
+            {
+                float stepTop = (z / StepAdvance) * 0.35f + 0.84f; // the path climbs 0.35 per step
+                var g = new GameObject("Pendant"); g.transform.position = new Vector3(0f, stepTop + 5.6f, z);
+                Part(PrimitiveType.Cylinder, g.transform, "Cord", new Vector3(0f, -1.1f, 0f), new Vector3(0.035f, 2.2f, 0.035f), cordMat);
+                Part(PrimitiveType.Sphere, g.transform, "Bulb", new Vector3(0f, -2.35f, 0f), new Vector3(0.34f, 0.34f, 0.34f), bulbMat);
+            }
+            // Back wall + striped awning + bunting
             var wall = Box("BakeryWall", finishPos + new Vector3(0f, 2.2f, 4.5f), new Vector3(16f, 6f, 0.3f), Mat("Wall", new Color(0.99f, 0.87f, 0.9f), 1f, 0.25f));
+            var awnPink = Mat("AwningPink", new Color(0.97f, 0.6f, 0.7f), 1f, 0.45f);
+            var awnWhite = Mat("AwningWhite", new Color(1f, 0.98f, 0.95f), 1f, 0.45f);
+            for (int i = 0; i < 8; i++)
+            {
+                var stripe = Box("Awning", finishPos + new Vector3(-7f + i * 2f + 1f, 5.6f, 3.9f), new Vector3(2f, 0.08f, 1.6f), i % 2 == 0 ? awnPink : awnWhite);
+                stripe.transform.rotation = Quaternion.Euler(-22f, 0f, 0f);
+            }
             var buntMats = new[] { cakeMats[0], cakeMats[1], cakeMats[2], cherryMat };
             for (int i = 0; i < 9; i++)
             {
                 float x = -4f + i;
-                float y = finishPos.y + 4.6f - Mathf.Abs(i - 4) * -0.06f - Mathf.Sin(i / 8f * Mathf.PI) * 0.35f;
+                float y = finishPos.y + 4.6f - Mathf.Sin(i / 8f * Mathf.PI) * 0.35f;
                 Part(PrimitiveType.Sphere, wall.transform.parent, "Bunting", new Vector3(x, y, finishPos.z + 4.3f), new Vector3(0.22f, 0.3f, 0.1f), buntMats[i % buntMats.Length]);
             }
         }
@@ -269,7 +334,7 @@ namespace Crunchee.EditorTools
         static Texture2D CheckerTexture()
         {
             var tex = new Texture2D(128, 128) { wrapMode = TextureWrapMode.Repeat };
-            var cream = new Color(0.99f, 0.93f, 0.83f); var pink = new Color(0.97f, 0.8f, 0.8f);
+            var cream = new Color(0.99f, 0.94f, 0.86f); var pink = new Color(0.96f, 0.74f, 0.78f);
             for (int y = 0; y < 128; y++)
                 for (int x = 0; x < 128; x++)
                     tex.SetPixel(x, y, ((x / 64) + (y / 64)) % 2 == 0 ? cream : pink);
@@ -298,14 +363,12 @@ namespace Crunchee.EditorTools
 
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            // Joystick base (bottom-left)
             var joyBase = MakeCircle(canvasGo.transform, "JoystickBase", new Vector2(150f, 210f), 190f, new Color(1, 1, 1, 0.28f));
             var knob = MakeCircle(joyBase.transform, "Knob", Vector2.zero, 96f, new Color(1, 1, 1, 0.55f));
             var joy = joyBase.gameObject.AddComponent<VirtualJoystick>();
             joy.baseRect = joyBase; joy.knobRect = knob;
             MakeLabel(canvasGo.transform, "MOVE", new Vector2(150f, 78f), font);
 
-            // JUMP button (bottom-right): circle w/ centered arrow, JUMP label BELOW like MOVE
             var jump = MakeCircle(canvasGo.transform, "JumpButton", new Vector2(-150f, 210f), 210f, new Color(1f, 0.62f, 0.72f, 0.45f), anchorRight: true);
             jump.gameObject.AddComponent<JumpButton>();
             var arrow = new GameObject("Arrow").AddComponent<Text>();
