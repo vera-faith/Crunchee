@@ -86,9 +86,9 @@ namespace Crunchee.EditorTools
             var patMat = Mat("ButterPat", new Color(1f, 0.89f, 0.45f), 1f, 0.65f);
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
 
-            // --- Start platform ---
+            // --- Start platform (top level with the first butter's climb: 0.35 below its pat) ---
             Vector3 pos = Vector3.zero;
-            var start = Box("StartPlatform", pos, new Vector3(4f, 0.4f, 4f), platformMat);
+            var start = Box("StartPlatform", new Vector3(0f, 0.29f, 0f), new Vector3(4f, 0.4f, 4f), platformMat);
 
             // --- The path ---
             foreach (var s in LevelPath.ButterPath())

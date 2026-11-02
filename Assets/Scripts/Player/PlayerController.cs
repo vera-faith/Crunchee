@@ -29,7 +29,7 @@ namespace Crunchee.Player
         void Awake()
         {
             cc = GetComponent<CharacterController>();
-            cc.stepOffset = 0.55f; // tall enough to walk up onto the next squishy in the climb
+            cc.stepOffset = 0.6f; // tall enough to walk up onto the next squishy in the climb
             squash = GetComponentInChildren<SquashAndStretch>();
         }
 
