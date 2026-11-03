@@ -411,14 +411,17 @@ namespace Crunchee.EditorTools
         {
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon.png");
             if (icon == null) { Debug.Log("[Crunchee] No Assets/AppIcon.png - icon skipped."); return; }
-            // Unity 6 stores icons via the PlatformIcons API; the legacy
-            // SetIconsForTargetGroup compiles but silently writes nothing.
+            // Unity 6.6: the legacy setter is the working path, but it demands
+            // an array of the platform's exact slot count (iPhone: 9,
+            // Standalone: 8) - a 1-element array errors out and writes nothing.
             foreach (var group in new[] { BuildTargetGroup.iOS, BuildTargetGroup.Standalone })
             {
-                var platformIcons = PlayerSettings.GetPlatformIcons(group, IconKind.Application);
-                for (int i = 0; i < platformIcons.Length; i++) platformIcons[i].SetTexture(icon);
-                PlayerSettings.SetPlatformIcons(group, IconKind.Application, platformIcons);
-                Debug.Log($"[Crunchee] App icon applied to {group}: {platformIcons.Length} slot(s).");
+                int count = PlayerSettings.GetIconsForTargetGroup(group, IconKind.Application).Length;
+                if (count == 0) count = group == BuildTargetGroup.iOS ? 9 : 8;
+                var arr = new Texture2D[count];
+                for (int i = 0; i < count; i++) arr[i] = icon;
+                PlayerSettings.SetIconsForTargetGroup(group, arr, IconKind.Application);
+                Debug.Log($"[Crunchee] App icon applied to {group}: {count} slot(s) filled.");
             }
         }
 
