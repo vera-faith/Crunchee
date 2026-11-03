@@ -36,8 +36,27 @@ namespace Crunchee.EditorTools
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
             if (alpha < 1f)
             {
-                if (m.HasProperty("_Surface")) m.SetFloat("_Surface", 1f); // transparent (URP)
                 m.renderQueue = 3000;
+                if (m.HasProperty("_Surface"))
+                {
+                    // URP Lit: transparent surface
+                    m.SetFloat("_Surface", 1f);
+                    m.SetFloat("_Blend", 0f);
+                    m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                }
+                else if (m.HasProperty("_Mode"))
+                {
+                    // Built-in Standard shader (this project): Fade/Transparent
+                    // mode must be configured explicitly or the material renders
+                    // OPAQUE despite its alpha (the black-decal bug, Nov 2).
+                    m.SetFloat("_Mode", 3f); // Transparent
+                    m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    m.SetInt("_ZWrite", 0);
+                    m.DisableKeyword("_ALPHATEST_ON");
+                    m.EnableKeyword("_ALPHABLEND_ON");
+                    m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                }
             }
             return m;
         }
