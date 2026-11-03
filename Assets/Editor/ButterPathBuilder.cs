@@ -327,7 +327,7 @@ namespace Crunchee.EditorTools
             var white = Mat("EyeShine", new Color(1f, 1f, 1f), 1f, 0.3f);
             var blushM = Mat("Blush", new Color(1f, 0.62f, 0.66f), 0.55f, 0.6f);
 
-            var player = new GameObject("Player_PuddingBunny");
+            var player = new GameObject("Player_PuddingBunny") { tag = "Player" }; // FinishTrigger/Checkpoint find her by this tag
             player.transform.position = at;
             var cc = player.AddComponent<CharacterController>(); cc.height = 1.1f; cc.radius = 0.35f; cc.center = new Vector3(0f, 0.55f, 0f);
             player.AddComponent<PlayerController>();
