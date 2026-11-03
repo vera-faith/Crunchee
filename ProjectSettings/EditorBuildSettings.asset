@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/ButterPath.unity
+    guid: 3c92852f9daf642768a54398b3a48aa9
   m_configObjects: {}
