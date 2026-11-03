@@ -46,8 +46,8 @@ namespace Crunchee.Core
         const int CrackW = 512, CrackH = 256;
         // Wax-plate gap inks: shadowed depth, the butter showing through the
         // split, and the bright broken edge of the wax itself.
-        static readonly Color GapShadow = new Color(0.45f, 0.28f, 0.1f, 0.55f);
-        static readonly Color GapButter = new Color(0.99f, 0.8f, 0.34f, 0.9f);
+        static readonly Color GapShadow = new Color(0.45f, 0.28f, 0.1f, 0.6f);
+        static readonly Color GapButter = new Color(0.99f, 0.8f, 0.34f, 0.92f);
         static readonly Color GapEdge = new Color(1f, 1f, 1f, 0.85f);
         readonly List<Vector2> crackNodes = new List<Vector2>();
         readonly HashSet<long> crackEdges = new HashSet<long>();
@@ -132,7 +132,7 @@ namespace Crunchee.Core
                     lp.z = Mathf.Clamp(lp.z, -0.46f, 0.46f);
                     var dp = dentDecal.transform.localPosition;
                     dentDecal.transform.localPosition = new Vector3(lp.x, dp.y, lp.z);
-                    float grow = 0.95f + 0.4f * sink;
+                    float grow = 0.95f + 0.5f * sink;
                     dentDecal.transform.localScale = new Vector3(dentBaseScale.x * grow, dentBaseScale.y, dentBaseScale.z * grow);
                     var dc = dentMat.color;
                     dc.a = 0.9f * dentShown * (0.3f + 0.7f * sink);
@@ -295,10 +295,20 @@ namespace Crunchee.Core
             var mid = (a + b) * 0.5f;
             var nrm = new Vector2(-(b.y - a.y), b.x - a.x) / len;
             mid += nrm * Random.Range(-len * 0.045f, len * 0.045f); // nearly straight, slight irregularity
-            DrawGapPass(a, mid, GapShadow, 4.6f); DrawGapPass(mid, b, GapShadow, 4.6f);
-            DrawGapPass(a, mid, GapButter, 2.6f); DrawGapPass(mid, b, GapButter, 2.6f);
+            DrawGapPass(a, mid, GapShadow, 5.2f); DrawGapPass(mid, b, GapShadow, 5.2f);
+            DrawGapPass(a, mid, GapButter, 3.0f); DrawGapPass(mid, b, GapButter, 3.0f);
             var off = new Vector2(1.7f, 1.7f);
             DrawGapPass(a + off, mid + off, GapEdge, 1.1f); DrawGapPass(mid + off, b + off, GapEdge, 1.1f);
+            // A long border sometimes sprouts one short T-stub - real plates
+            // micro-crack off their edges. It grows FROM the border, so it
+            // never reads as a random mark.
+            if (len > 70f && Random.value < 0.45f)
+            {
+                float side = Random.value < 0.5f ? -1f : 1f;
+                var tip = mid + nrm * side * Random.Range(13f, 19f);
+                DrawGapPass(mid, tip, GapButter, 1.8f);
+                DrawGapPass(mid + off, tip + off, GapEdge, 0.9f);
+            }
         }
 
         void StampSparkle(Vector2 c)

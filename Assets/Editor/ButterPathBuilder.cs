@@ -87,13 +87,23 @@ namespace Crunchee.EditorTools
             RenderSettings.fogEndDistance = 105f;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.52f, 0.47f, 0.41f);
+            RenderSettings.reflectionIntensity = 1.15f; // glossier squishies (big build)
+
+            // --- Render quality (big build): MSAA, crisp shadows, full aniso ---
+            QualitySettings.antiAliasing = 4;
+            QualitySettings.shadowDistance = 70f;
+            QualitySettings.shadowResolution = ShadowResolution.High;
+            QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
 
             // --- Lighting: warm golden bakery sun ---
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.3f;
+            sun.type = LightType.Directional; sun.intensity = 1.35f;
             sun.color = new Color(1f, 0.86f, 0.64f);
             sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             sun.shadows = LightShadows.Soft;
+            sun.shadowStrength = 0.8f;
+            sun.shadowBias = 0.02f;
+            sun.shadowNormalBias = 0.04f;
 
             // --- The bakery COUNTER the whole path sits on (mockup: warm peachy
             // countertop, no checker floor) ---
@@ -130,7 +140,12 @@ namespace Crunchee.EditorTools
             // --- Finish platform + dressing ---
             pos += new Vector3(0f, 0.35f, 3.4f);
             var finish = Box("FinishPlatform", pos, new Vector3(4.2f, 0.4f, 4.2f), platformMat);
-            finish.AddComponent<FinishTrigger>();
+            // The trigger is its own invisible zone ABOVE the solid platform,
+            // so she can stand on the platform AND trip the finish.
+            var zone = Box("FinishZone", pos + new Vector3(0f, 1.1f, 0f), new Vector3(4.2f, 2.2f, 4.2f), platformMat);
+            Object.DestroyImmediate(zone.GetComponent<MeshRenderer>());
+            zone.GetComponent<Collider>().isTrigger = true;
+            zone.AddComponent<FinishTrigger>();
             BuildBakeryDressing(pos);
 
             // --- Player: Pudding Bunny ---
@@ -155,6 +170,20 @@ namespace Crunchee.EditorTools
 
             // --- UI ---
             BuildUI(player);
+
+            // --- iOS / App Store identity (set now so the TestFlight build is
+            // a straight export later) ---
+            PlayerSettings.productName = "Crunchee";
+            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, "com.verafaith.crunchee");
+            PlayerSettings.bundleVersion = "1.0.0";
+            PlayerSettings.iOS.buildNumber = "1";
+            PlayerSettings.iOS.appleDeveloperTeamID = "738KBBGF8K";
+            PlayerSettings.iOS.appleEnableAutomaticSigning = true;
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            PlayerSettings.allowedAutorotateToPortrait = true;
+            PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+            PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+            PlayerSettings.allowedAutorotateToLandscapeRight = false;
 
             if (!AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.CreateFolder("Assets", "Scenes");
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/ButterPath.unity");
@@ -305,41 +334,42 @@ namespace Crunchee.EditorTools
             var model = new GameObject("Model"); model.transform.SetParent(player.transform, false);
             model.AddComponent<SquashAndStretch>();
 
-            // One-piece flan: big round belly + wide flat-fronted head (cylinder
+            // One-piece flan: big round belly + WIDE flat-fronted head (cylinder
             // gives the concept's flatter face, so drips and face sit right)
             Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.3f, 0f), new Vector3(0.8f, 0.74f, 0.72f), pudding);
-            Part(PrimitiveType.Cylinder, model.transform, "Head", new Vector3(0f, 0.88f, 0f), new Vector3(0.84f, 0.31f, 0.78f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "HeadTop", new Vector3(0f, 1.14f, 0f), new Vector3(0.8f, 0.3f, 0.74f), pudding);
+            Part(PrimitiveType.Cylinder, model.transform, "Head", new Vector3(0f, 0.86f, 0f), new Vector3(0.95f, 0.3f, 0.82f), pudding);
+            Part(PrimitiveType.Sphere, model.transform, "HeadTop", new Vector3(0f, 1.1f, 0f), new Vector3(0.92f, 0.26f, 0.8f), pudding);
             // Thick caramel poured over the head, with LONG drips down the face
-            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.1f, 0f), new Vector3(0.9f, 0.46f, 0.8f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.06f, 0f), new Vector3(0.98f, 0.36f, 0.86f), caramel);
             foreach (var side in new[] { -1f, 1f })
-                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(side * 0.28f, 0.74f, 0.29f), new Vector3(0.11f, 0.4f, 0.09f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(0.03f, 0.78f, 0.35f), new Vector3(0.1f, 0.3f, 0.09f), caramel);
+                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(side * 0.3f, 0.72f, 0.3f), new Vector3(0.11f, 0.4f, 0.09f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(0.03f, 0.76f, 0.37f), new Vector3(0.1f, 0.3f, 0.09f), caramel);
             foreach (var side in new[] { -1f, 1f })
-                Part(PrimitiveType.Sphere, model.transform, "DripSide", new Vector3(side * 0.4f, 0.82f, 0.05f), new Vector3(0.09f, 0.3f, 0.11f), caramel);
+                Part(PrimitiveType.Sphere, model.transform, "DripSide", new Vector3(side * 0.45f, 0.8f, 0.05f), new Vector3(0.09f, 0.3f, 0.11f), caramel);
             // Caramel poured over the shoulders too, scalloped drip edge in front
-            Part(PrimitiveType.Sphere, model.transform, "CaramelPour", new Vector3(0f, 0.56f, 0f), new Vector3(0.86f, 0.34f, 0.78f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "CaramelPour", new Vector3(0f, 0.55f, 0f), new Vector3(0.88f, 0.34f, 0.8f), caramel);
             foreach (var sx in new[] { -0.3f, -0.15f, 0f, 0.15f, 0.3f })
             {
                 float zz = 0.35f - Mathf.Abs(sx) * 0.36f;
                 float yy = 0.42f - Mathf.Abs(sx) * 0.2f;
                 Part(PrimitiveType.Sphere, model.transform, "Scallop", new Vector3(sx, yy, zz), new Vector3(0.13f, 0.17f, 0.09f), caramel);
             }
-            // Very long plain ears hanging straight down beside the head
+            // Very long plain ears hanging straight down beside the head,
+            // hugging it like the concept art
             foreach (var side in new[] { -1f, 1f })
             {
-                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.45f, 0.74f, -0.02f), new Vector3(0.17f, 0.48f, 0.13f), pudding);
-                ear.transform.rotation = Quaternion.Euler(0f, 0f, -side * 5f);
+                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.5f, 0.7f, -0.02f), new Vector3(0.18f, 0.55f, 0.13f), pudding);
+                ear.transform.rotation = Quaternion.Euler(0f, 0f, -side * 3f);
             }
             // Tiny simple face: small brown dot eyes (one sparkle each), a tiny
             // smile line, soft round blush low on the cheeks
             foreach (var side in new[] { -1f, 1f })
             {
-                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.17f, 0.84f, 0.35f), new Vector3(0.075f, 0.1f, 0.04f), brown);
-                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.17f + 0.016f, 0.875f, 0.365f), new Vector3(0.024f, 0.034f, 0.02f), white);
-                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.31f, 0.76f, 0.255f), new Vector3(0.13f, 0.085f, 0.03f), blushM);
+                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.18f, 0.82f, 0.375f), new Vector3(0.07f, 0.092f, 0.04f), brown);
+                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.18f + 0.014f, 0.852f, 0.398f), new Vector3(0.022f, 0.03f, 0.018f), white);
+                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.33f, 0.74f, 0.29f), new Vector3(0.13f, 0.085f, 0.03f), blushM);
             }
-            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.73f, 0.382f), new Vector3(0.1f, 0.028f, 0.02f), brown);
+            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.71f, 0.4f), new Vector3(0.1f, 0.028f, 0.02f), brown);
             // Stubby arms at her sides, little legs + round feet, tiny tail
             foreach (var side in new[] { -1f, 1f })
             {
@@ -351,7 +381,6 @@ namespace Crunchee.EditorTools
             Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.34f), new Vector3(0.17f, 0.17f, 0.17f), pudding);
             return player;
         }
-
         static GameObject Part(PrimitiveType t, Transform parent, string name, Vector3 localPos, Vector3 scale, Material m)
         {
             var go = GameObject.CreatePrimitive(t);
@@ -435,6 +464,54 @@ namespace Crunchee.EditorTools
                 float fx = -3.6f + i * 3.6f;
                 Box("Frame", finishPos + new Vector3(fx, 2.9f, 4.28f), new Vector3(1.7f, 2.1f, 0.07f), frameMat);
                 Box("FrameArt", finishPos + new Vector3(fx, 2.9f, 4.23f), new Vector3(1.45f, 1.85f, 0.07f), cakeMats[i % cakeMats.Length]);
+            }
+
+            // Glowing bakery windows on the back wall (big build)
+            var paneMat = EmissiveMat("WindowPane", new Color(1f, 0.85f, 0.6f), 0.9f);
+            foreach (var wx in new[] { -5.6f, 5.6f })
+            {
+                Box("WindowFrame", finishPos + new Vector3(wx, 2.7f, 4.3f), new Vector3(1.5f, 2.3f, 0.08f), frameMat);
+                Box("WindowPane", finishPos + new Vector3(wx, 2.7f, 4.24f), new Vector3(1.25f, 2.05f, 0.08f), paneMat);
+                Box("WindowBar", finishPos + new Vector3(wx, 2.7f, 4.2f), new Vector3(1.25f, 0.07f, 0.06f), frameMat);
+                Box("WindowBar", finishPos + new Vector3(wx, 2.7f, 4.2f), new Vector3(0.07f, 2.05f, 0.06f), frameMat);
+            }
+
+            // The FINISH CAKE waiting on the finish platform (big build)
+            {
+                var cakeBase = finishPos + new Vector3(0f, 0.2f, 1.15f);
+                var g = new GameObject("FinishCake"); g.transform.position = cakeBase;
+                Part(PrimitiveType.Cylinder, g.transform, "Tier1", new Vector3(0f, 0.26f, 0f), new Vector3(2.2f, 0.52f, 2.2f), cakeMats[2]);
+                Part(PrimitiveType.Cylinder, g.transform, "Tier2", new Vector3(0f, 0.72f, 0f), new Vector3(1.5f, 0.44f, 1.5f), cakeMats[0]);
+                Part(PrimitiveType.Cylinder, g.transform, "Tier3", new Vector3(0f, 1.1f, 0f), new Vector3(0.95f, 0.36f, 0.95f), cakeMats[1]);
+                for (int i = 0; i < 6; i++)
+                {
+                    float a = i / 6f * Mathf.PI * 2f;
+                    Part(PrimitiveType.Sphere, g.transform, "CakeCherry", new Vector3(Mathf.Cos(a) * 0.82f, 0.58f, Mathf.Sin(a) * 0.82f), new Vector3(0.13f, 0.13f, 0.13f), cherryMat);
+                }
+                foreach (var cx in new[] { -0.22f, 0f, 0.22f })
+                {
+                    Part(PrimitiveType.Cylinder, g.transform, "Candle", new Vector3(cx, 1.42f, 0f), new Vector3(0.05f, 0.3f, 0.05f), Mat("Candle", new Color(1f, 0.97f, 0.92f), 1f, 0.5f));
+                    Part(PrimitiveType.Sphere, g.transform, "Flame", new Vector3(cx, 1.62f, 0f), new Vector3(0.055f, 0.09f, 0.055f), EmissiveMat("Flame", new Color(1f, 0.72f, 0.3f), 2.2f));
+                }
+            }
+
+            // Soft frosting MOUNDS on the horizon - a dreamy bakery backdrop
+            var moundCols = new[]
+            {
+                new Color(1f, 0.93f, 0.82f), new Color(1f, 0.8f, 0.85f),
+                new Color(0.78f, 0.93f, 0.82f), new Color(0.85f, 0.82f, 0.95f),
+            };
+            var mounds = new[]
+            {
+                new Vector3(-11f, -0.5f, 27f), new Vector3(11.5f, -0.5f, 28f),
+                new Vector3(-13f, -0.5f, 12f), new Vector3(13.5f, -0.5f, 9f),
+                new Vector3(-12f, -0.5f, -4f), new Vector3(12.5f, -0.5f, -5f),
+            };
+            for (int i = 0; i < mounds.Length; i++)
+            {
+                var m = Mat($"Mound{i}", moundCols[i % moundCols.Length], 1f, 0.25f);
+                float s = 5.5f + (i % 3) * 1.3f;
+                Part(PrimitiveType.Sphere, null, "Mound", mounds[i], new Vector3(s, s * 0.52f, s), m);
             }
 
             // Flour-dust patches sprinkled on the counter
@@ -650,7 +727,7 @@ namespace Crunchee.EditorTools
         /// <summary>Glossy butter surface: soft golden swirls + a few bright streaks (mockup).</summary>
         static Texture2D ButterSwirlTexture()
         {
-            return LoadOrCreateTexture("Assets/Textures/ButterSwirl.png", 256, 128, (x, y, w, h) =>
+            return LoadOrCreateTexture("Assets/Textures/ButterSwirl.png", 512, 256, (x, y, w, h) =>
             {
                 float u = x / (float)w, v = y / (float)h;
                 float wave = Mathf.Sin((v * 3.2f + Mathf.Sin(u * 6.28f) * 0.35f) * 6.28f) * 0.5f + 0.5f;
@@ -665,7 +742,7 @@ namespace Crunchee.EditorTools
         /// <summary>Warm peachy countertop: layered mottle, fine speckle, faint plank seams.</summary>
         static Texture2D CounterTexture()
         {
-            return LoadOrCreateTexture("Assets/Textures/Countertop.png", 256, 256, (x, y, w, h) =>
+            return LoadOrCreateTexture("Assets/Textures/Countertop.png", 512, 512, (x, y, w, h) =>
             {
                 float n = Mathf.Sin(x * 0.11f) * Mathf.Sin(y * 0.13f) * 0.5f
                         + Mathf.Sin((x + y) * 0.021f) * 0.5f
@@ -752,6 +829,43 @@ namespace Crunchee.EditorTools
             arrow.color = Color.white;
             var art = arrow.rectTransform; art.anchorMin = art.anchorMax = new Vector2(0.5f, 0.5f); art.sizeDelta = new Vector2(140f, 140f);
             MakeLabel(canvasGo.transform, "JUMP", new Vector2(-150f, 78f), font, anchorRight: true);
+
+            // --- Progress pips (top center) + finish banner (big build) ---
+            var hud = canvasGo.AddComponent<ProgressHud>();
+            var pips = new UnityEngine.UI.Image[10];
+            for (int i = 0; i < 10; i++)
+            {
+                var pip = MakeCircle(canvasGo.transform, $"Pip{i}", Vector2.zero, 26f, new Color(1, 1, 1, 0.35f));
+                pip.anchorMin = pip.anchorMax = new Vector2(0.5f, 1f);
+                pip.anchoredPosition = new Vector2((i - 4.5f) * 36f, -46f);
+                pips[i] = pip.GetComponent<UnityEngine.UI.Image>();
+            }
+            hud.pips = pips;
+
+            var banner = new GameObject("FinishBanner");
+            banner.transform.SetParent(canvasGo.transform, false);
+            var brt = banner.AddComponent<RectTransform>();
+            brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f);
+            brt.anchoredPosition = new Vector2(0f, 130f);
+            brt.sizeDelta = new Vector2(620f, 230f);
+            var pill = MakeCircle(banner.transform, "Pill", Vector2.zero, 300f, new Color(1f, 0.62f, 0.72f, 0.92f));
+            pill.anchorMin = pill.anchorMax = new Vector2(0.5f, 0.5f);
+            pill.anchoredPosition = Vector2.zero;
+            pill.sizeDelta = new Vector2(620f, 210f);
+            var big = new GameObject("BannerTitle").AddComponent<Text>();
+            big.transform.SetParent(banner.transform, false);
+            big.text = "YOU DID IT!"; big.font = font; big.fontSize = 72; big.alignment = TextAnchor.MiddleCenter;
+            big.color = Color.white;
+            var bigRt = big.rectTransform; bigRt.anchorMin = bigRt.anchorMax = new Vector2(0.5f, 0.5f);
+            bigRt.anchoredPosition = new Vector2(0f, 34f); bigRt.sizeDelta = new Vector2(600f, 100f);
+            var small = new GameObject("BannerSub").AddComponent<Text>();
+            small.transform.SetParent(banner.transform, false);
+            small.text = "All 10 butters cracked!"; small.font = font; small.fontSize = 34; small.alignment = TextAnchor.MiddleCenter;
+            small.color = new Color(1f, 0.95f, 0.9f);
+            var smallRt = small.rectTransform; smallRt.anchorMin = smallRt.anchorMax = new Vector2(0.5f, 0.5f);
+            smallRt.anchoredPosition = new Vector2(0f, -42f); smallRt.sizeDelta = new Vector2(600f, 60f);
+            banner.SetActive(false);
+            hud.banner = banner;
             _ = controls;
         }
 
