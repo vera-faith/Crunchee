@@ -165,6 +165,36 @@ namespace Crunchee.Audio
         }
 
         /// <summary>
+        /// THE squish (Faith's sound model, Nov 3): the default sound of moving
+        /// on a squishy - a soft wet foamy press with a low bloop as the surface
+        /// gives under her weight. Coatings layer their own sound OVER this.
+        /// deep = the bigger landing version.
+        /// </summary>
+        public static AudioClip SquishStep(int seed, bool deep = false)
+        {
+            var r = new System.Random(seed * 6151 + 29);
+            float dur = deep ? 0.3f : 0.17f;
+            var d = NewBuf(dur);
+            float lp = 0, lp2 = 0;
+            double phase = 0;
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)SR;
+                float x = t / dur;
+                float env = Mathf.Sin(Mathf.PI * Mathf.Pow(x, 0.7f)); // swell in, release out
+                env *= env;
+                lp += 0.10f * (Noise(r) - lp);        // foamy body
+                lp2 += 0.35f * (Noise(r) - lp2);      // brighter surface noise
+                double freq = Mathf.Lerp(deep ? 118f : 148f, 58f, x);
+                phase += 2 * Mathf.PI * freq / SR;
+                float bloop = Mathf.Sin((float)phase) * 0.5f;
+                float squelch = (lp2 - lp) * 0.8f;    // wet band movement
+                d[i] = (lp * 1.15f + squelch * 0.5f + bloop * (deep ? 0.7f : 0.5f)) * env;
+            }
+            return ToClip(deep ? "Synth_SquishDeep" : "Synth_SquishStep", d);
+        }
+
+        /// <summary>
         /// Footstep crackle for walking around on already-cracked wax (Faith,
         /// Nov 2): a shorter, brighter cousin of the full crack - a soft sole
         /// press plus a few micro-snaps, density still grows with layer count.

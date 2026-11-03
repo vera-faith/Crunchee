@@ -245,10 +245,29 @@ namespace Crunchee.EditorTools
                 decalRend = decal.GetComponent<MeshRenderer>();
             }
 
+            // Dent decal: a soft shadow disc that follows the character on the
+            // squishy, deepening as she sinks - you can SEE her sinking into it
+            // wherever she moves (Faith, Nov 3). Sits just under the crack plane.
+            MeshRenderer dentRend = null;
+            {
+                var dentMat = Mat("Dent", Color.white, 0.99f, 0.5f);
+                dentMat.mainTexture = DentTexture();
+                dentMat.renderQueue = 3001;
+                var dent = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                dent.name = "DentDecal";
+                dent.transform.position = pos + new Vector3(0f, ButterH / 2f + PatH + ButterH * 0.2f + ButterH * 0.25f + 0.006f, 0f);
+                dent.transform.localScale = new Vector3(0.15f, 1f, 0.15f);
+                dent.GetComponent<MeshRenderer>().material = dentMat;
+                Object.DestroyImmediate(dent.GetComponent<Collider>());
+                dent.transform.SetParent(step.transform, true);
+                dentRend = dent.GetComponent<MeshRenderer>();
+            }
+
             var sq = step.AddComponent<Squishy>();
             sq.baseMaterial = BaseMaterial.Butter; sq.coating = coating; sq.waxLayers = waxLayers;
             sq.coatingShell = shell;
             sq.crackDecal = decalRend;
+            sq.dentDecal = dentRend;
 
             var ps = new GameObject("StepParticles").AddComponent<ParticleSystem>();
             ps.transform.SetParent(step.transform, false);
@@ -269,10 +288,12 @@ namespace Crunchee.EditorTools
         static GameObject BuildPuddingBunny(Vector3 at)
         {
             var pudding = Mat("Pudding", new Color(1f, 0.9f, 0.66f), 1f, 1f);
+            var cream = Mat("Cream", new Color(1f, 0.96f, 0.85f), 1f, 1f);
             var caramel = Mat("Caramel", new Color(0.83f, 0.48f, 0.16f), 1f, 1f);
             var dark = Mat("FaceDark", new Color(0.2f, 0.11f, 0.07f), 1f, 0.35f);
             var white = Mat("EyeShine", new Color(1f, 1f, 1f), 1f, 0.3f);
-            var pink = Mat("Blush", new Color(1f, 0.6f, 0.66f), 1f, 0.6f);
+            var pink = Mat("Blush", new Color(1f, 0.6f, 0.66f), 0.75f, 0.6f);
+            var innerEar = Mat("InnerEar", new Color(1f, 0.72f, 0.76f), 1f, 0.7f);
             var mouth = Mat("Mouth", new Color(0.45f, 0.16f, 0.14f), 1f, 0.5f);
             var tongue = Mat("Tongue", new Color(1f, 0.55f, 0.6f), 1f, 0.6f);
 
@@ -283,43 +304,52 @@ namespace Crunchee.EditorTools
             var model = new GameObject("Model"); model.transform.SetParent(player.transform, false);
             model.AddComponent<SquashAndStretch>();
 
-            // Flan body + caramel layer over its top
-            Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.34f, 0f), new Vector3(0.58f, 0.5f, 0.55f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "BodyCaramel", new Vector3(0f, 0.5f, 0f), new Vector3(0.6f, 0.2f, 0.57f), caramel);
-            // Little arms + feet
+            // Flan body + caramel layer over its top + cream belly
+            Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.33f, 0f), new Vector3(0.6f, 0.48f, 0.56f), pudding);
+            Part(PrimitiveType.Sphere, model.transform, "BodyCaramel", new Vector3(0f, 0.48f, 0f), new Vector3(0.62f, 0.2f, 0.58f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "Belly", new Vector3(0f, 0.32f, 0.19f), new Vector3(0.34f, 0.3f, 0.15f), cream);
+            // Little arms + feet with pink toe pads
             foreach (var side in new[] { -1f, 1f })
             {
-                Part(PrimitiveType.Sphere, model.transform, "Arm", new Vector3(side * 0.3f, 0.38f, 0.04f), new Vector3(0.13f, 0.18f, 0.13f), pudding);
-                Part(PrimitiveType.Sphere, model.transform, "Foot", new Vector3(side * 0.15f, 0.05f, 0.15f), new Vector3(0.2f, 0.09f, 0.3f), pudding);
+                Part(PrimitiveType.Sphere, model.transform, "Arm", new Vector3(side * 0.31f, 0.36f, 0.06f), new Vector3(0.13f, 0.19f, 0.13f), pudding);
+                Part(PrimitiveType.Sphere, model.transform, "Foot", new Vector3(side * 0.16f, 0.05f, 0.16f), new Vector3(0.21f, 0.09f, 0.31f), pudding);
+                Part(PrimitiveType.Sphere, model.transform, "ToePad", new Vector3(side * 0.16f, 0.08f, 0.29f), new Vector3(0.08f, 0.035f, 0.06f), innerEar);
             }
             // Curled tail (two puffs)
-            Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.27f), new Vector3(0.17f, 0.17f, 0.17f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "TailCurl", new Vector3(0.02f, 0.42f, -0.3f), new Vector3(0.11f, 0.11f, 0.11f), pudding);
+            Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.28f), new Vector3(0.19f, 0.19f, 0.19f), pudding);
+            Part(PrimitiveType.Sphere, model.transform, "TailCurl", new Vector3(0.03f, 0.43f, -0.31f), new Vector3(0.12f, 0.12f, 0.12f), pudding);
 
-            // Big round head
-            Part(PrimitiveType.Sphere, model.transform, "Head", new Vector3(0f, 0.86f, 0f), new Vector3(0.64f, 0.58f, 0.6f), pudding);
-            // Caramel poured over the head + drips down the forehead
-            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.03f, 0f), new Vector3(0.67f, 0.34f, 0.63f), caramel);
-            foreach (var dx in new[] { -0.2f, 0.02f, 0.22f })
-                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(dx, 0.94f - Mathf.Abs(dx) * 0.2f, 0.26f), new Vector3(0.09f, 0.2f, 0.08f), caramel);
-            // Long floppy ears hanging down beside the head, caramel-dipped tips
+            // BIG round head (cuter proportions: head clearly bigger than body)
+            Part(PrimitiveType.Sphere, model.transform, "Head", new Vector3(0f, 0.88f, 0f), new Vector3(0.72f, 0.64f, 0.66f), pudding);
+            // Caramel poured over the head + a swirl dollop on top + drips
+            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.06f, 0f), new Vector3(0.75f, 0.36f, 0.69f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "Swirl", new Vector3(0f, 1.24f, 0f), new Vector3(0.2f, 0.13f, 0.2f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "SwirlTip", new Vector3(0.02f, 1.33f, 0f), new Vector3(0.1f, 0.09f, 0.1f), caramel);
+            foreach (var dx in new[] { -0.21f, 0.02f, 0.23f })
+                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(dx, 0.97f - Mathf.Abs(dx) * 0.2f, 0.29f), new Vector3(0.1f, 0.24f, 0.09f), caramel);
+            // Long floppy ears with pink inners + caramel-dipped tips
             foreach (var side in new[] { -1f, 1f })
             {
-                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.3f, 0.82f, -0.03f), new Vector3(0.17f, 0.52f, 0.09f), pudding);
-                ear.transform.rotation = Quaternion.Euler(10f, 0f, side * 18f);
-                var tip = Part(PrimitiveType.Sphere, model.transform, "EarTip", new Vector3(side * 0.38f, 0.5f, -0.08f), new Vector3(0.16f, 0.2f, 0.08f), caramel);
+                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.33f, 0.84f, -0.03f), new Vector3(0.19f, 0.56f, 0.1f), pudding);
+                ear.transform.rotation = Quaternion.Euler(8f, 0f, side * 16f);
+                var inner = Part(PrimitiveType.Sphere, model.transform, "InnerEar", new Vector3(side * 0.345f, 0.8f, 0.045f), new Vector3(0.1f, 0.3f, 0.04f), innerEar);
+                inner.transform.rotation = ear.transform.rotation;
+                var tip = Part(PrimitiveType.Sphere, model.transform, "EarTip", new Vector3(side * 0.42f, 0.47f, -0.07f), new Vector3(0.18f, 0.22f, 0.09f), caramel);
                 tip.transform.rotation = ear.transform.rotation;
             }
-            // Face: BIG shiny eyes with highlights, tiny nose, open smile + tongue, blush
+            // Face: BIG shiny eyes (two highlights each), cream muzzle cheeks,
+            // tiny nose, open smile + tongue, soft blush
             foreach (var side in new[] { -1f, 1f })
             {
-                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.13f, 0.88f, 0.27f), new Vector3(0.1f, 0.14f, 0.05f), dark);
-                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.13f - 0.025f, 0.93f, 0.315f), new Vector3(0.035f, 0.05f, 0.02f), white);
-                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.25f, 0.76f, 0.24f), new Vector3(0.11f, 0.06f, 0.03f), pink);
+                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.14f, 0.9f, 0.3f), new Vector3(0.11f, 0.15f, 0.05f), dark);
+                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.14f - 0.03f, 0.945f, 0.345f), new Vector3(0.04f, 0.055f, 0.02f), white);
+                Part(PrimitiveType.Sphere, model.transform, "EyeShine2", new Vector3(side * 0.14f + 0.025f, 0.87f, 0.348f), new Vector3(0.02f, 0.03f, 0.02f), white);
+                Part(PrimitiveType.Sphere, model.transform, "Cheek", new Vector3(side * 0.16f, 0.76f, 0.26f), new Vector3(0.17f, 0.13f, 0.12f), cream);
+                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.27f, 0.79f, 0.26f), new Vector3(0.13f, 0.07f, 0.03f), pink);
             }
-            Part(PrimitiveType.Sphere, model.transform, "Nose", new Vector3(0f, 0.83f, 0.31f), new Vector3(0.055f, 0.04f, 0.03f), pink);
-            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.75f, 0.29f), new Vector3(0.1f, 0.08f, 0.04f), mouth);
-            Part(PrimitiveType.Sphere, model.transform, "Tongue", new Vector3(0f, 0.72f, 0.3f), new Vector3(0.06f, 0.05f, 0.03f), tongue);
+            Part(PrimitiveType.Sphere, model.transform, "Nose", new Vector3(0f, 0.84f, 0.345f), new Vector3(0.06f, 0.045f, 0.03f), tongue);
+            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.755f, 0.325f), new Vector3(0.11f, 0.085f, 0.04f), mouth);
+            Part(PrimitiveType.Sphere, model.transform, "Tongue", new Vector3(0f, 0.725f, 0.335f), new Vector3(0.065f, 0.05f, 0.03f), tongue);
             return player;
         }
 
@@ -537,6 +567,18 @@ namespace Crunchee.EditorTools
                 var a = new Color(0.965f, 0.79f, 0.6f);
                 var b = new Color(0.92f, 0.7f, 0.5f);
                 return Color.Lerp(a, b, Mathf.Clamp01(n * 0.5f + 0.5f));
+            });
+        }
+
+        /// <summary>Soft radial shadow for the dent she presses into a squishy.</summary>
+        static Texture2D DentTexture()
+        {
+            return LoadOrCreateTexture("Assets/Textures/Dent.png", 128, 128, (x, y, w, h) =>
+            {
+                float dx = (x - w / 2f) / (w / 2f), dy = (y - h / 2f) / (h / 2f);
+                float d = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy));
+                float a = Mathf.Pow(1f - d, 1.7f) * 0.85f;
+                return new Color(0.36f, 0.22f, 0.12f, a);
             });
         }
 

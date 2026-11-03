@@ -85,13 +85,14 @@ namespace Crunchee.Player
                 }
             }
 
-            // Footsteps on the squishy: every half-unit of travel across its
-            // surface cracks a little more wax - visually and audibly.
+            // Footsteps on the squishy: every step cracks a little more wax -
+            // visually (the trail connects) and audibly (squish + crackle).
             if (groundSquishy != null)
             {
                 var p = transform.position;
+                groundSquishy.TrackPlayer(p);
                 distOnSquishy += new Vector2(p.x - lastPos.x, p.z - lastPos.z).magnitude;
-                if (distOnSquishy > 0.5f)
+                if (distOnSquishy > 0.42f)
                 {
                     distOnSquishy = 0f;
                     groundSquishy.OnStep(p);

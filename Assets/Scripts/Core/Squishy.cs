@@ -28,6 +28,7 @@ namespace Crunchee.Core
         public ParticleSystem stepParticles;   // burst unique to material x coating
         public GameObject coatingShell;        // shell root; wax/polish hold crackable pieces as children
         public MeshRenderer crackDecal;        // plane on the shell top; cracks are drawn into its texture underfoot
+        public MeshRenderer dentDecal;         // soft shadow disc that follows her - the visible dent she sinks into
 
         SquishProfile profile;
         Vector3 restScale;
@@ -42,6 +43,11 @@ namespace Crunchee.Core
         readonly List<Shard> shards = new List<Shard>();
         static Material shardMat;
         Texture2D crackTex;
+        const int CrackW = 512, CrackH = 256;
+        static readonly Color CrackInk = new Color(0.15f, 0.09f, 0.07f, 0.9f);
+        Vector2 trailPx; bool hasTrail;
+        Material dentMat; Vector3 dentBaseScale; float dentShown;
+        Vector3 trackPos; float trackTime = -10f;
 
         public bool Cracked => cracked;
         public float TopY => col != null ? col.bounds.max.y : transform.position.y;
@@ -53,10 +59,16 @@ namespace Crunchee.Core
             col = GetComponent<Collider>();
             if (crackDecal != null)
             {
-                crackTex = new Texture2D(256, 256, TextureFormat.RGBA32, false);
-                crackTex.SetPixels32(new Color32[256 * 256]); // fully transparent
+                crackTex = new Texture2D(CrackW, CrackH, TextureFormat.RGBA32, false);
+                crackTex.SetPixels32(new Color32[CrackW * CrackH]); // fully transparent
                 crackTex.Apply();
                 crackDecal.material.mainTexture = crackTex;
+            }
+            if (dentDecal != null)
+            {
+                dentMat = dentDecal.material;
+                dentBaseScale = dentDecal.transform.localScale;
+                dentDecal.enabled = false;
             }
             if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish))
             {
@@ -98,6 +110,30 @@ namespace Crunchee.Core
             float xz = 1f + (1f - y) * 0.55f; // volume-ish bulge sideways as it sinks
             transform.localScale = new Vector3(restScale.x * xz, restScale.y * y, restScale.z * xz);
 
+            // The dent: a soft pressed-in shadow that FOLLOWS her across the
+            // squishy and deepens with the sink, so you can see her sinking
+            // into the surface wherever she stands or walks (Faith, Nov 3).
+            if (dentDecal != null && dentMat != null)
+            {
+                bool show = occupied && Time.time - trackTime < 0.25f;
+                dentShown = Mathf.MoveTowards(dentShown, show ? 1f : 0f, Time.deltaTime * 5f);
+                if (dentShown > 0.01f)
+                {
+                    dentDecal.enabled = true;
+                    var lp = transform.InverseTransformPoint(trackPos);
+                    lp.x = Mathf.Clamp(lp.x, -0.46f, 0.46f);
+                    lp.z = Mathf.Clamp(lp.z, -0.46f, 0.46f);
+                    var dp = dentDecal.transform.localPosition;
+                    dentDecal.transform.localPosition = new Vector3(lp.x, dp.y, lp.z);
+                    float grow = 0.95f + 0.4f * sink;
+                    dentDecal.transform.localScale = new Vector3(dentBaseScale.x * grow, dentBaseScale.y, dentBaseScale.z * grow);
+                    var dc = dentMat.color;
+                    dc.a = 0.9f * dentShown * (0.3f + 0.7f * sink);
+                    dentMat.color = dc;
+                }
+                else dentDecal.enabled = false;
+            }
+
             // Shell-split animation
             if (shellPieces != null && crackAnim < 1f && cracked)
             {
@@ -116,6 +152,9 @@ namespace Crunchee.Core
         /// <summary>Called by the player while standing on this squishy (drives the sink).</summary>
         public void SetOccupied(bool value) => occupied = value;
 
+        /// <summary>Player reports her position every frame while on this squishy (drives the dent).</summary>
+        public void TrackPlayer(Vector3 worldPos) { trackPos = worldPos; trackTime = Time.time; }
+
         /// <summary>First touch: crack + sound + particles, then the sink takes over.</summary>
         public void OnLanded(float impactSpeed, Vector3 worldPos)
         {
@@ -125,7 +164,7 @@ namespace Crunchee.Core
                 occupied = true;
                 sink = Mathf.Max(sink, 0.3f); // the initial give as weight lands
                 CrackShell();
-                AddFootCrack(worldPos, 0.85f); // the big first crack star under the landing
+                AddNetworkCrack(worldPos, 1.05f); // the big bold crack network under the landing
                 AsmrAudio.PlaySquish(baseMaterial, coating, transform.position,
                                      coating == Coating.Wax ? waxLayers : 1);
                 if (stepParticles != null)
@@ -145,70 +184,122 @@ namespace Crunchee.Core
         }
 
         /// <summary>
-        /// One footstep while walking around on this squishy (Faith, Nov 2): the
-        /// wax keeps cracking - a crack star appears under the foot and a short
-        /// crackle plays, so moving around a butter audibly and visibly cracks
-        /// more and more of its surface.
+        /// One footstep while walking around on this squishy (Faith, Nov 3): the
+        /// crack TRAIL connects from her last step to this one, so ALL of her
+        /// movement shows on the wax; the sound is the soft squish of the
+        /// squishy itself with a wax crackle layered over it (more crackle on
+        /// thicker wax).
         /// </summary>
         public void OnStep(Vector3 worldPos)
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
-            if (coating == Coating.Wax)
-            {
-                AddFootCrack(worldPos, 0.3f + waxLayers * 0.014f);
-                AsmrAudio.PlayStepCrack(transform.position, waxLayers);
-                if (stepParticles != null) stepParticles.Emit(2);
-            }
-            else AsmrAudio.PlaySoftBase(transform.position);
+            AddTrailCrack(worldPos);
+            AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
+                               coating == Coating.Wax ? waxLayers : 0);
+            if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(1);
         }
 
-        /// <summary>Draw a jagged crack star into the decal texture at a world position.</summary>
-        public void AddFootCrack(Vector3 worldPos, float radiusWorld)
+        // --- Crack drawing (Faith, Nov 3, from the reference videos): cracks are
+        // BOLD dark jagged strokes forming a connected network - a big branching
+        // burst on landing, then a continuous trail connecting every step, so
+        // all of her movement shows on the wax. Not faint random marks. ---
+
+        Vector2 WorldToCrackPx(Vector3 worldPos)
         {
-            if (crackTex == null || crackDecal == null) return;
             var lp = crackDecal.transform.InverseTransformPoint(worldPos);
-            float u = lp.x / 10f + 0.5f, v = lp.z / 10f + 0.5f;
-            if (u < -0.1f || u > 1.1f || v < -0.1f || v > 1.1f) return;
-            int cx = Mathf.RoundToInt(u * 255f), cy = Mathf.RoundToInt(v * 255f);
-            float radPx = radiusWorld / Mathf.Max(0.1f, crackDecal.bounds.size.x) * 256f;
-            var ink = new Color(0.23f, 0.2f, 0.28f, 0.62f);
-            for (int r = 0; r < 6; r++)
-            {
-                float a = r / 6f * Mathf.PI * 2f + Random.Range(-0.4f, 0.4f);
-                float len = radPx * Random.Range(0.55f, 1.05f);
-                float x = cx, y = cy;
-                int segs = Mathf.Max(2, Mathf.RoundToInt(len / 7f));
-                for (int sgi = 0; sgi < segs; sgi++)
+            return new Vector2((lp.x / 10f + 0.5f) * (CrackW - 1), (lp.z / 10f + 0.5f) * (CrackH - 1));
+        }
+
+        bool InCrackRange(Vector2 p) => p.x > -24f && p.x < CrackW + 24f && p.y > -24f && p.y < CrackH + 24f;
+
+        void StampPx(float x, float y, float radius, float alphaScale)
+        {
+            int r = Mathf.CeilToInt(radius);
+            int cx = Mathf.RoundToInt(x), cy = Mathf.RoundToInt(y);
+            for (int ox = -r; ox <= r; ox++)
+                for (int oy = -r; oy <= r; oy++)
                 {
-                    a += Random.Range(-0.45f, 0.45f);
-                    float nx = x + Mathf.Cos(a) * 7f, ny = y + Mathf.Sin(a) * 7f;
-                    DrawSeg(x, y, nx, ny, ink);
-                    x = nx; y = ny;
+                    float d = Mathf.Sqrt(ox * ox + oy * oy);
+                    if (d > radius) continue;
+                    int X = cx + ox, Y = cy + oy;
+                    if (X < 0 || X >= CrackW || Y < 0 || Y >= CrackH) continue;
+                    float fall = 1f - d / Mathf.Max(0.001f, radius);
+                    float a = CrackInk.a * alphaScale * (0.5f + 0.5f * fall);
+                    var cur = crackTex.GetPixel(X, Y);
+                    crackTex.SetPixel(X, Y, new Color(CrackInk.r, CrackInk.g, CrackInk.b, Mathf.Max(cur.a, a)));
+                }
+        }
+
+        void StampLine(Vector2 a, Vector2 b, float coreRadius)
+        {
+            int steps = Mathf.CeilToInt(Vector2.Distance(a, b) / 2f);
+            for (int pass = 0; pass < 2; pass++)
+            {
+                float r = pass == 0 ? coreRadius * 2.0f : coreRadius;   // soft dark halo, then firm core
+                float aScale = pass == 0 ? 0.30f : 1f;
+                for (int i = 0; i <= steps; i++)
+                {
+                    var p = Vector2.Lerp(a, b, steps == 0 ? 0f : i / (float)steps);
+                    StampPx(p.x, p.y, r, aScale);
                 }
             }
-            DrawSeg(cx - 2, cy, cx + 2, cy, ink);
-            DrawSeg(cx, cy - 2, cx, cy + 2, ink);
-            crackTex.Apply();
         }
 
-        void DrawSeg(float x0, float y0, float x1, float y1, Color ink)
+        void DrawCrackSeg(Vector2 a, Vector2 b, float coreRadius)
         {
-            int steps = Mathf.CeilToInt(Mathf.Max(Mathf.Abs(x1 - x0), Mathf.Abs(y1 - y0)));
-            for (int i = 0; i <= steps; i++)
+            float len = Vector2.Distance(a, b);
+            int n = Mathf.Max(1, Mathf.RoundToInt(len / 10f));
+            var dir = len > 0.01f ? (b - a) / len : Vector2.right;
+            var perp = new Vector2(-dir.y, dir.x);
+            var prev = a;
+            for (int i = 1; i <= n; i++)
             {
-                float t = steps == 0 ? 0f : i / (float)steps;
-                int px = Mathf.RoundToInt(Mathf.Lerp(x0, x1, t));
-                int py = Mathf.RoundToInt(Mathf.Lerp(y0, y1, t));
-                for (int ox = -1; ox <= 1; ox++)
-                    for (int oy = -1; oy <= 1; oy++)
-                    {
-                        if (Mathf.Abs(ox) + Mathf.Abs(oy) == 2) continue; // diamond brush
-                        int X = px + ox, Y = py + oy;
-                        if (X < 0 || X > 255 || Y < 0 || Y > 255) continue;
-                        var cur = crackTex.GetPixel(X, Y);
-                        crackTex.SetPixel(X, Y, new Color(ink.r, ink.g, ink.b, Mathf.Max(cur.a, ink.a)));
-                    }
+                var p = Vector2.Lerp(a, b, i / (float)n);
+                if (i < n) p += perp * Random.Range(-4f, 4f); // jagged wander
+                StampLine(prev, p, coreRadius);
+                prev = p;
             }
+        }
+
+        /// <summary>The landing burst: 9 long jagged branches + sub-branches, a real crack network.</summary>
+        public void AddNetworkCrack(Vector3 worldPos, float radiusWorld)
+        {
+            if (crackTex == null || crackDecal == null) return;
+            var c = WorldToCrackPx(worldPos);
+            if (!InCrackRange(c)) { hasTrail = false; return; }
+            for (int i = 0; i < 9; i++)
+            {
+                float ang = i / 9f * Mathf.PI * 2f + Random.Range(-0.3f, 0.3f);
+                float len = radiusWorld * Random.Range(0.65f, 1.1f);
+                var dirW = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                DrawCrackSeg(c, WorldToCrackPx(worldPos + dirW * len), 3.1f);
+                float bang = ang + Random.Range(0.5f, 1.0f) * (Random.value < 0.5f ? -1f : 1f);
+                var midW = worldPos + dirW * len * 0.55f;
+                var bendW = midW + new Vector3(Mathf.Cos(bang), 0f, Mathf.Sin(bang)) * len * 0.4f;
+                DrawCrackSeg(WorldToCrackPx(midW), WorldToCrackPx(bendW), 2.1f);
+            }
+            StampPx(c.x, c.y, 7f, 1f); // chipped center
+            crackTex.Apply();
+            trailPx = c; hasTrail = true;
+        }
+
+        /// <summary>Connect this step to the last one with a bold jagged crack line.</summary>
+        public void AddTrailCrack(Vector3 worldPos)
+        {
+            if (crackTex == null || crackDecal == null) return;
+            var p = WorldToCrackPx(worldPos);
+            if (!InCrackRange(p)) { hasTrail = false; return; }
+            if (hasTrail && Vector2.Distance(p, trailPx) < 140f)
+            {
+                DrawCrackSeg(trailPx, p, 2.6f);
+                if (Random.value < 0.6f) // short branchlet off the trail
+                {
+                    float ang = Random.Range(0f, Mathf.PI * 2f);
+                    DrawCrackSeg(p, p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(10f, 22f), 1.7f);
+                }
+                crackTex.Apply();
+            }
+            trailPx = p; hasTrail = true;
         }
 
         void CrackShell()
