@@ -105,9 +105,9 @@ namespace Crunchee.EditorTools
             floorMat.mainTextureScale = new Vector2(5f, 18f);
             floor.GetComponent<MeshRenderer>().material = floorMat;
 
-            var butterMat = Mat("Butter", new Color(1f, 0.84f, 0.34f), 1f, 0.75f);
+            var butterMat = Mat("Butter", new Color(1f, 0.9f, 0.5f), 1f, 0.75f);
             butterMat.mainTexture = ButterSwirlTexture();
-            var patMat = Mat("ButterPat", new Color(1f, 0.88f, 0.44f), 1f, 0.8f);
+            var patMat = Mat("ButterPat", new Color(1f, 0.92f, 0.55f), 1f, 0.8f);
             patMat.mainTexture = ButterSwirlTexture();
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
@@ -518,8 +518,8 @@ namespace Crunchee.EditorTools
             {
                 float u = x / (float)w, v = y / (float)h;
                 float wave = Mathf.Sin((v * 3.2f + Mathf.Sin(u * 6.28f) * 0.35f) * 6.28f) * 0.5f + 0.5f;
-                var deep = new Color(0.95f, 0.68f, 0.14f);
-                var lite = new Color(1f, 0.84f, 0.36f);
+                var deep = new Color(0.96f, 0.74f, 0.2f);
+                var lite = new Color(1f, 0.87f, 0.42f);
                 var c = Color.Lerp(deep, lite, wave * 0.65f + 0.18f);
                 float streak = Mathf.Pow(Mathf.Max(0f, Mathf.Sin((u * 0.8f + v) * 10f)), 10f) * 0.13f;
                 return new Color(Mathf.Min(1f, c.r + streak), Mathf.Min(1f, c.g + streak), Mathf.Min(1f, c.b + streak * 0.8f));
