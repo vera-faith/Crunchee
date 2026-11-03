@@ -411,9 +411,15 @@ namespace Crunchee.EditorTools
         {
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon.png");
             if (icon == null) { Debug.Log("[Crunchee] No Assets/AppIcon.png - icon skipped."); return; }
-            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.iOS, new[] { icon }, IconKind.Application);
-            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Standalone, new[] { icon }, IconKind.Application);
-            Debug.Log("[Crunchee] App icon applied from Assets/AppIcon.png.");
+            // Unity 6 stores icons via the PlatformIcons API; the legacy
+            // SetIconsForTargetGroup compiles but silently writes nothing.
+            foreach (var group in new[] { BuildTargetGroup.iOS, BuildTargetGroup.Standalone })
+            {
+                var platformIcons = PlayerSettings.GetPlatformIcons(group, IconKind.Application);
+                for (int i = 0; i < platformIcons.Length; i++) platformIcons[i].SetTexture(icon);
+                PlayerSettings.SetPlatformIcons(group, IconKind.Application, platformIcons);
+                Debug.Log($"[Crunchee] App icon applied to {group}: {platformIcons.Length} slot(s).");
+            }
         }
 
         static GameObject Part(PrimitiveType t, Transform parent, string name, Vector3 localPos, Vector3 scale, Material m)
