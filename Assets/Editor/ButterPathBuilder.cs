@@ -83,10 +83,10 @@ namespace Crunchee.EditorTools
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = bg;
-            RenderSettings.fogStartDistance = 34f;
-            RenderSettings.fogEndDistance = 100f;
+            RenderSettings.fogStartDistance = 40f;
+            RenderSettings.fogEndDistance = 105f;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.64f, 0.58f, 0.5f);
+            RenderSettings.ambientLight = new Color(0.52f, 0.47f, 0.41f);
 
             // --- Lighting: warm golden bakery sun ---
             var sun = new GameObject("Sun").AddComponent<Light>();
@@ -494,8 +494,8 @@ namespace Crunchee.EditorTools
         /// <summary>Load a generated texture asset, creating it (PNG in Assets/Textures) on first build.</summary>
         static Texture2D LoadOrCreateTexture(string path, int w, int h, System.Func<int, int, int, int, Color> pixel)
         {
-            var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (existing != null) return existing;
+            // Always regenerate: the pixel functions in code are the single
+            // source of truth, so color tweaks apply on the next build.
             if (!AssetDatabase.IsValidFolder("Assets/Textures")) AssetDatabase.CreateFolder("Assets", "Textures");
             var tex = new Texture2D(w, h);
             for (int y = 0; y < h; y++)
@@ -518,8 +518,8 @@ namespace Crunchee.EditorTools
             {
                 float u = x / (float)w, v = y / (float)h;
                 float wave = Mathf.Sin((v * 3.2f + Mathf.Sin(u * 6.28f) * 0.35f) * 6.28f) * 0.5f + 0.5f;
-                var deep = new Color(0.97f, 0.75f, 0.23f);
-                var lite = new Color(1f, 0.89f, 0.47f);
+                var deep = new Color(0.95f, 0.68f, 0.14f);
+                var lite = new Color(1f, 0.84f, 0.36f);
                 var c = Color.Lerp(deep, lite, wave * 0.65f + 0.18f);
                 float streak = Mathf.Pow(Mathf.Max(0f, Mathf.Sin((u * 0.8f + v) * 10f)), 10f) * 0.13f;
                 return new Color(Mathf.Min(1f, c.r + streak), Mathf.Min(1f, c.g + streak), Mathf.Min(1f, c.b + streak * 0.8f));
@@ -534,8 +534,8 @@ namespace Crunchee.EditorTools
                 float n = Mathf.Sin(x * 0.11f) * Mathf.Sin(y * 0.13f) * 0.5f
                         + Mathf.Sin((x + y) * 0.021f) * 0.5f
                         + Mathf.Sin(x * 0.53f + y * 0.31f) * 0.12f;
-                var a = new Color(0.985f, 0.885f, 0.76f);
-                var b = new Color(0.955f, 0.835f, 0.7f);
+                var a = new Color(0.965f, 0.79f, 0.6f);
+                var b = new Color(0.92f, 0.7f, 0.5f);
                 return Color.Lerp(a, b, Mathf.Clamp01(n * 0.5f + 0.5f));
             });
         }
