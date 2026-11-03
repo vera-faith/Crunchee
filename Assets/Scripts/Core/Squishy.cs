@@ -194,9 +194,42 @@ namespace Crunchee.Core
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
             AddTrailCrack(worldPos);
+            if (coating == Coating.Wax) SpawnStepChips(worldPos); // pieces keep breaking off underfoot
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
                                coating == Coating.Wax ? waxLayers : 0);
             if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(1);
+        }
+
+        /// <summary>
+        /// Tiny wax chips pop off at her feet as she walks (Faith, Nov 3): the
+        /// wax keeps breaking into smaller pieces, not just on the first crack.
+        /// </summary>
+        void SpawnStepChips(Vector3 at)
+        {
+            if (shardMat == null)
+            {
+                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                shardMat = new Material(sh) { color = new Color(1f, 1f, 1f, 0.92f) };
+            }
+            int count = 2 + (waxLayers >= 5 ? 1 : 0);
+            for (int i = 0; i < count; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.GetComponent<MeshRenderer>().material = shardMat;
+                Destroy(go.GetComponent<Collider>());
+                float sz = Random.Range(0.03f, 0.065f);
+                go.transform.localScale = new Vector3(sz, sz * 0.4f, sz);
+                go.transform.position = at + new Vector3(Random.Range(-0.16f, 0.16f), TopY + 0.03f, Random.Range(-0.16f, 0.16f));
+                shards.Add(new Shard
+                {
+                    go = go,
+                    vel = new Vector3(Random.Range(-0.8f, 0.8f), Random.Range(1.0f, 1.9f), Random.Range(-0.8f, 0.8f)),
+                    spin = Random.Range(-10f, 10f),
+                    life = Random.Range(0.35f, 0.5f),
+                    age = 0f,
+                    baseScale = go.transform.localScale
+                });
+            }
         }
 
         // --- Crack drawing (Faith, Nov 3, from the reference videos): cracks are
@@ -292,7 +325,15 @@ namespace Crunchee.Core
             if (hasTrail && Vector2.Distance(p, trailPx) < 140f)
             {
                 DrawCrackSeg(trailPx, p, 2.6f);
-                if (Random.value < 0.6f) // short branchlet off the trail
+                // Web cracks: short connectors sprayed around each step, so the
+                // surface keeps subdividing into SMALLER pieces the more she
+                // walks on it (Faith, Nov 3).
+                for (int wI = 0; wI < 2; wI++)
+                {
+                    float ang = Random.Range(0f, Mathf.PI * 2f);
+                    DrawCrackSeg(p, p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(24f, 46f), 1.6f);
+                }
+                if (Random.value < 0.8f) // short branchlet off the trail
                 {
                     float ang = Random.Range(0f, Mathf.PI * 2f);
                     DrawCrackSeg(p, p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(10f, 22f), 1.7f);

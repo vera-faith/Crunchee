@@ -40,13 +40,14 @@ namespace Crunchee.Audio
             if (Instance == null) return;
             var self = Instance;
 
-            // Base layer (Faith's model): the SQUISH itself - a deep soft press,
-            // with the butter body's low thump tucked underneath.
+            // Landing (Faith's model, Nov 3): FIRST the squish as her weight
+            // lands, THEN the wax crack a beat later - and the crack is the
+            // loud part. The squish stays present but modest.
             int dv = Random.Range(0, 3);
             var deep = self.Synth($"squishdeep{dv}", () => AsmrSynth.SquishStep(Random.Range(1, 99999), true));
-            self.PlayOne(self.baseSource, deep, Random.Range(0.95f, 1.03f), 0.95f);
+            self.PlayOne(self.baseSource, deep, Random.Range(0.95f, 1.03f), 0.7f);
             var thump = self.FromTable(self.baseClips, (int)b) ?? self.Synth("butter", () => AsmrSynth.ButterBase(Random.Range(1, 99999)));
-            self.PlayOne(self.baseSource, thump, Random.Range(0.94f, 1.02f), 0.35f);
+            self.PlayOne(self.baseSource, thump, Random.Range(0.94f, 1.02f), 0.22f);
 
             if (c == Coating.Plain) return;
 
@@ -56,9 +57,9 @@ namespace Crunchee.Audio
                 var clip = self.FromTable(self.coatingClips, (int)c)
                            ?? self.Synth($"wax{layers}", () => AsmrSynth.WaxCrack(layers, Random.Range(1, 99999)));
                 float f = (layers - 1) / 9f;
-                self.PlayOne(self.coatingSource, clip,
+                self.StartCoroutine(self.PlayDelayed(self.coatingSource, clip,
                              Mathf.Lerp(1.03f, 0.88f, f) * Random.Range(0.98f, 1.02f),
-                             Mathf.Lerp(0.75f, 1f, f));
+                             Mathf.Lerp(0.8f, 1f, f), 0.07f));
             }
             else
             {
@@ -73,14 +74,13 @@ namespace Crunchee.Audio
             if (Instance == null) return;
             int v = Random.Range(0, 3);
             var clip = Instance.Synth($"squishstep{v}", () => AsmrSynth.SquishStep(Random.Range(1, 99999)));
-            Instance.PlayOne(Instance.baseSource, clip, Random.Range(0.92f, 1f), 0.3f);
+            Instance.PlayOne(Instance.baseSource, clip, Random.Range(0.92f, 1f), 0.16f);
         }
 
         /// <summary>
-        /// One walking step on a squishy (Faith's sound model, Nov 3): the soft
-        /// SQUISH plays every step; the coating layers its sound OVER it - for
-        /// wax, a crackle whose volume grows with the layer count (a whisper on
-        /// butter 1, loud and dense on butter 10).
+        /// One walking step on a squishy (Faith, Nov 3): the WAX CRACKLE is the
+        /// main sound - multiple cracks per step, growing with layer count -
+        /// over a much quieter squish bed.
         /// </summary>
         public static void PlayStep(Vector3 pos, BaseMaterial b, Coating c, int waxLayers)
         {
@@ -88,14 +88,14 @@ namespace Crunchee.Audio
             var self = Instance;
             int v = Random.Range(0, 3);
             var squish = self.Synth($"squishstep{v}", () => AsmrSynth.SquishStep(Random.Range(1, 99999)));
-            self.PlayOne(self.baseSource, squish, Random.Range(0.95f, 1.08f), 0.5f);
+            self.PlayOne(self.baseSource, squish, Random.Range(0.95f, 1.08f), 0.13f);
 
             if (c == Coating.Wax && waxLayers > 0)
             {
                 int cv = Random.Range(0, 4);
                 var crack = self.Synth($"waxstep{waxLayers}_{cv}", () => AsmrSynth.WaxStepCrack(waxLayers, Random.Range(1, 99999)));
                 self.PlayOne(self.coatingSource, crack, Random.Range(0.94f, 1.06f),
-                             0.16f + 0.05f * Mathf.Clamp(waxLayers, 1, 10));
+                             0.34f + 0.06f * Mathf.Clamp(waxLayers, 1, 10));
             }
         }
 
@@ -131,6 +131,12 @@ namespace Crunchee.Audio
             if (clip == null) return;
             src.pitch = pitch; src.volume = volume;
             src.PlayOneShot(clip);
+        }
+
+        System.Collections.IEnumerator PlayDelayed(AudioSource src, AudioClip clip, float pitch, float volume, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            PlayOne(src, clip, pitch, volume);
         }
     }
 }

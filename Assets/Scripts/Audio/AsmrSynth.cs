@@ -203,9 +203,9 @@ namespace Crunchee.Audio
         {
             layers = Mathf.Clamp(layers, 1, 10);
             var r = new System.Random(seed * 31337 + layers * 71);
-            float dur = 0.08f + layers * 0.007f;
+            float dur = 0.1f + layers * 0.011f;
             var d = NewBuf(dur + 0.03f);
-            int snaps = 3 + layers;
+            int snaps = 6 + layers * 2; // multiple cracks per step (Faith, Nov 3)
             for (int s = 0; s < snaps; s++)
             {
                 int start = (int)(r.NextDouble() * dur * 0.8f * SR);
@@ -220,13 +220,13 @@ namespace Crunchee.Audio
                     d[start + i] += hp * env * amp;
                 }
             }
-            // soft sole press underneath
+            // soft sole press underneath - kept faint, the crackle is the point
             float lp = 0;
             for (int i = 0; i < d.Length; i++)
             {
                 float t = i / (float)SR;
                 lp += 0.2f * (Noise(r) - lp);
-                d[i] += lp * Mathf.Exp(-t * 40f) * 0.22f;
+                d[i] += lp * Mathf.Exp(-t * 40f) * 0.1f;
             }
             return ToClip("Synth_WaxStep", d);
         }
