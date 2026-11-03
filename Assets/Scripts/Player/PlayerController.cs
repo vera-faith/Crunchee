@@ -25,12 +25,15 @@ namespace Crunchee.Player
         Vector2 dragInput;
         Squishy groundSquishy;
         bool wasGrounded;
+        float distOnSquishy;
+        Vector3 lastPos;
 
         void Awake()
         {
             cc = GetComponent<CharacterController>();
             cc.stepOffset = 0.6f; // tall enough to walk up onto the next squishy in the climb
             squash = GetComponentInChildren<SquashAndStretch>();
+            lastPos = transform.position;
         }
 
         void Update()
@@ -73,13 +76,28 @@ namespace Crunchee.Player
             {
                 ReleaseSquishy();
                 groundSquishy = sq;
+                distOnSquishy = 0f;
                 if (sq != null)
                 {
                     sq.SetOccupied(true);
-                    sq.OnLanded(Mathf.Abs(velocity.y));
+                    sq.OnLanded(Mathf.Abs(velocity.y), transform.position);
                     if (!wasGrounded) squash?.OnLand();
                 }
             }
+
+            // Footsteps on the squishy: every half-unit of travel across its
+            // surface cracks a little more wax - visually and audibly.
+            if (groundSquishy != null)
+            {
+                var p = transform.position;
+                distOnSquishy += new Vector2(p.x - lastPos.x, p.z - lastPos.z).magnitude;
+                if (distOnSquishy > 0.5f)
+                {
+                    distOnSquishy = 0f;
+                    groundSquishy.OnStep(p);
+                }
+            }
+            lastPos = transform.position;
 
             // Ride the surface: as the squishy sinks (or recovers), stay glued to its top.
             if (groundSquishy != null && cc.isGrounded)

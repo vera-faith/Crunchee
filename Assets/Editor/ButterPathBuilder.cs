@@ -14,15 +14,14 @@ namespace Crunchee.EditorTools
 {
     /// <summary>
     /// One-click map build. Menu: Crunchee > Build Butter Path Scene
-    /// Bakery map (Faith's design + reference videos): ONE long path of GIANT
-    /// butters the character walks across. One land per squishy -> coating
-    /// cracks -> character slowly sinks in.
-    ///   start platform
-    ///   -> 10 WAX butters, layers 1..10, LOW-OPACITY wax (alpha 0.12/layer, capped 0.75),
-    ///      shell built as 4 pieces so it can visibly split open
-    ///   -> 4 SUGAR, 4 HONEY, 4 NAIL POLISH (polish shells crack too)
-    ///   -> finish platform, Pudding Bunny, bakery dressing, warm fog + pendants,
-    ///      bird's-eye camera, joystick + JUMP UI.
+    /// Bakery map, Butter Path (Faith's focus round, Nov 2): ONLY the 10 wax
+    /// butters - each one a little whiter than the last (wax layers 1..10,
+    /// low-opacity build-up). One land per squishy -> coating cracks -> the
+    /// character slowly sinks in, and cracks keep spreading + crackling
+    /// underfoot wherever she walks on the butter.
+    ///   start platform -> 10 WAX butters -> finish platform,
+    ///   Pudding Bunny, bakery dressing, warm fog + pendants,
+    ///   bird's-eye camera, joystick + JUMP UI.
     /// </summary>
     public static class ButterPathBuilder
     {
@@ -90,33 +89,11 @@ namespace Crunchee.EditorTools
             Vector3 pos = Vector3.zero;
             var start = Box("StartPlatform", new Vector3(0f, 0.29f, 0f), new Vector3(4f, 0.4f, 4f), platformMat);
 
-            // --- The path ---
+            // --- The path: just the 10 wax butters, whiter each step (layers 1..10) ---
             foreach (var s in LevelPath.ButterPath())
             {
                 pos += new Vector3(s.sideOffset, s.heightOffset, StepAdvance);
                 BuildButter(pos, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat, patMat);
-            }
-            for (int i = 1; i <= 4; i++)
-            {
-                pos += new Vector3(0f, 0.35f, StepAdvance);
-                BuildButter(pos, $"Butter_Sugar_{i}", Coating.Sugar, 1, butterMat, patMat);
-            }
-            for (int i = 1; i <= 4; i++)
-            {
-                pos += new Vector3(0f, 0.35f, StepAdvance);
-                BuildButter(pos, $"Butter_Honey_{i}", Coating.Honey, 1, butterMat, patMat);
-            }
-            var polishColors = new[]
-            {
-                new Color(1f, 0.62f, 0.72f),   // pink
-                new Color(0.62f, 0.9f, 0.75f), // mint
-                new Color(0.78f, 0.7f, 0.98f), // lavender
-                new Color(0.6f, 0.82f, 1f),    // baby blue
-            };
-            for (int i = 1; i <= 4; i++)
-            {
-                pos += new Vector3(0f, 0.35f, StepAdvance);
-                BuildButter(pos, $"Butter_NailPolish_{i}", Coating.NailPolish, 1, butterMat, patMat, polishColors[i - 1]);
             }
 
             // --- Finish platform + dressing ---
@@ -208,9 +185,28 @@ namespace Crunchee.EditorTools
                 Object.DestroyImmediate(piece.GetComponent<Collider>());
             }
 
+            // Crack decal: an invisible plane hugging the shell top. The Squishy
+            // draws crack lines into its texture wherever the character walks,
+            // so cracks visibly spread and follow her across the butter.
+            MeshRenderer decalRend = null;
+            if (crackable)
+            {
+                var decalMat = Mat("CrackDecal", Color.white, 0.99f, 0.5f);
+                decalMat.renderQueue = 3002;
+                var decal = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                decal.name = "CrackDecal";
+                decal.transform.position = pos + new Vector3(0f, ButterH / 2f + PatH + ButterH * 0.2f + ButterH * 0.25f + 0.012f, 0f);
+                decal.transform.localScale = new Vector3(ButterW / 10f, 1f, ButterD / 10f);
+                decal.GetComponent<MeshRenderer>().material = decalMat;
+                Object.DestroyImmediate(decal.GetComponent<Collider>());
+                decal.transform.SetParent(step.transform, true);
+                decalRend = decal.GetComponent<MeshRenderer>();
+            }
+
             var sq = step.AddComponent<Squishy>();
             sq.baseMaterial = BaseMaterial.Butter; sq.coating = coating; sq.waxLayers = waxLayers;
             sq.coatingShell = shell;
+            sq.crackDecal = decalRend;
 
             var ps = new GameObject("StepParticles").AddComponent<ParticleSystem>();
             ps.transform.SetParent(step.transform, false);

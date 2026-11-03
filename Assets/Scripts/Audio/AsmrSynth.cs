@@ -163,5 +163,42 @@ namespace Crunchee.Audio
             }
             return ToClip("Synth_NailPolish", d);
         }
+
+        /// <summary>
+        /// Footstep crackle for walking around on already-cracked wax (Faith,
+        /// Nov 2): a shorter, brighter cousin of the full crack - a soft sole
+        /// press plus a few micro-snaps, density still grows with layer count.
+        /// </summary>
+        public static AudioClip WaxStepCrack(int layers, int seed)
+        {
+            layers = Mathf.Clamp(layers, 1, 10);
+            var r = new System.Random(seed * 31337 + layers * 71);
+            float dur = 0.08f + layers * 0.007f;
+            var d = NewBuf(dur + 0.03f);
+            int snaps = 3 + layers;
+            for (int s = 0; s < snaps; s++)
+            {
+                int start = (int)(r.NextDouble() * dur * 0.8f * SR);
+                int len = 40 + r.Next(120);
+                float amp = (0.25f + (float)r.NextDouble() * 0.45f) * (0.6f + layers * 0.04f);
+                float prev = 0;
+                for (int i = 0; i < len && start + i < d.Length; i++)
+                {
+                    float n = Noise(r);
+                    float hp = n - prev; prev = n;
+                    float env = Mathf.Exp(-i / (len * 0.4f));
+                    d[start + i] += hp * env * amp;
+                }
+            }
+            // soft sole press underneath
+            float lp = 0;
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)SR;
+                lp += 0.2f * (Noise(r) - lp);
+                d[i] += lp * Mathf.Exp(-t * 40f) * 0.22f;
+            }
+            return ToClip("Synth_WaxStep", d);
+        }
     }
 }

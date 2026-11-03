@@ -71,6 +71,15 @@ namespace Crunchee.Audio
             Instance.PlayOne(Instance.baseSource, clip, Random.Range(0.95f, 1.02f), 0.3f);
         }
 
+        /// <summary>Footstep crackle while walking on cracked wax (cached variants per layer count).</summary>
+        public static void PlayStepCrack(Vector3 pos, int waxLayers)
+        {
+            if (Instance == null) return;
+            int v = Random.Range(0, 4);
+            var clip = Instance.Synth($"waxstep{waxLayers}_{v}", () => AsmrSynth.WaxStepCrack(waxLayers, Random.Range(1, 99999)));
+            Instance.PlayOne(Instance.coatingSource, clip, Random.Range(0.94f, 1.06f), 0.5f);
+        }
+
         AudioClip SynthCoating(Coating c)
         {
             int v = Random.Range(0, 3); // a few cached variants per coating

@@ -27,6 +27,7 @@ namespace Crunchee.Core
 
         public ParticleSystem stepParticles;   // burst unique to material x coating
         public GameObject coatingShell;        // shell root; wax/polish hold crackable pieces as children
+        public MeshRenderer crackDecal;        // plane on the shell top; cracks are drawn into its texture underfoot
 
         SquishProfile profile;
         Vector3 restScale;
@@ -40,6 +41,7 @@ namespace Crunchee.Core
         Quaternion[] pieceHomeRot, pieceTargetRot;
         readonly List<Shard> shards = new List<Shard>();
         static Material shardMat;
+        Texture2D crackTex;
 
         public bool Cracked => cracked;
         public float TopY => col != null ? col.bounds.max.y : transform.position.y;
@@ -49,6 +51,13 @@ namespace Crunchee.Core
             profile = overrideProfile ? profileOverride : SquishProfile.DefaultFor(baseMaterial, coating);
             restScale = transform.localScale;
             col = GetComponent<Collider>();
+            if (crackDecal != null)
+            {
+                crackTex = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+                crackTex.SetPixels32(new Color32[256 * 256]); // fully transparent
+                crackTex.Apply();
+                crackDecal.material.mainTexture = crackTex;
+            }
             if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish))
             {
                 int n = coatingShell.transform.childCount;
@@ -108,7 +117,7 @@ namespace Crunchee.Core
         public void SetOccupied(bool value) => occupied = value;
 
         /// <summary>First touch: crack + sound + particles, then the sink takes over.</summary>
-        public void OnLanded(float impactSpeed)
+        public void OnLanded(float impactSpeed, Vector3 worldPos)
         {
             if (!cracked)
             {
@@ -116,6 +125,7 @@ namespace Crunchee.Core
                 occupied = true;
                 sink = Mathf.Max(sink, 0.3f); // the initial give as weight lands
                 CrackShell();
+                AddFootCrack(worldPos, 0.85f); // the big first crack star under the landing
                 AsmrAudio.PlaySquish(baseMaterial, coating, transform.position,
                                      coating == Coating.Wax ? waxLayers : 1);
                 if (stepParticles != null)
@@ -131,6 +141,73 @@ namespace Crunchee.Core
             {
                 // Already cracked: just a soft re-land thud, nothing re-triggers.
                 AsmrAudio.PlaySoftBase(transform.position);
+            }
+        }
+
+        /// <summary>
+        /// One footstep while walking around on this squishy (Faith, Nov 2): the
+        /// wax keeps cracking - a crack star appears under the foot and a short
+        /// crackle plays, so moving around a butter audibly and visibly cracks
+        /// more and more of its surface.
+        /// </summary>
+        public void OnStep(Vector3 worldPos)
+        {
+            if (!cracked) { OnLanded(0f, worldPos); return; }
+            if (coating == Coating.Wax)
+            {
+                AddFootCrack(worldPos, 0.3f + waxLayers * 0.014f);
+                AsmrAudio.PlayStepCrack(transform.position, waxLayers);
+                if (stepParticles != null) stepParticles.Emit(2);
+            }
+            else AsmrAudio.PlaySoftBase(transform.position);
+        }
+
+        /// <summary>Draw a jagged crack star into the decal texture at a world position.</summary>
+        public void AddFootCrack(Vector3 worldPos, float radiusWorld)
+        {
+            if (crackTex == null || crackDecal == null) return;
+            var lp = crackDecal.transform.InverseTransformPoint(worldPos);
+            float u = lp.x / 10f + 0.5f, v = lp.z / 10f + 0.5f;
+            if (u < -0.1f || u > 1.1f || v < -0.1f || v > 1.1f) return;
+            int cx = Mathf.RoundToInt(u * 255f), cy = Mathf.RoundToInt(v * 255f);
+            float radPx = radiusWorld / Mathf.Max(0.1f, crackDecal.bounds.size.x) * 256f;
+            var ink = new Color(0.23f, 0.2f, 0.28f, 0.62f);
+            for (int r = 0; r < 6; r++)
+            {
+                float a = r / 6f * Mathf.PI * 2f + Random.Range(-0.4f, 0.4f);
+                float len = radPx * Random.Range(0.55f, 1.05f);
+                float x = cx, y = cy;
+                int segs = Mathf.Max(2, Mathf.RoundToInt(len / 7f));
+                for (int sgi = 0; sgi < segs; sgi++)
+                {
+                    a += Random.Range(-0.45f, 0.45f);
+                    float nx = x + Mathf.Cos(a) * 7f, ny = y + Mathf.Sin(a) * 7f;
+                    DrawSeg(x, y, nx, ny, ink);
+                    x = nx; y = ny;
+                }
+            }
+            DrawSeg(cx - 2, cy, cx + 2, cy, ink);
+            DrawSeg(cx, cy - 2, cx, cy + 2, ink);
+            crackTex.Apply();
+        }
+
+        void DrawSeg(float x0, float y0, float x1, float y1, Color ink)
+        {
+            int steps = Mathf.CeilToInt(Mathf.Max(Mathf.Abs(x1 - x0), Mathf.Abs(y1 - y0)));
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = steps == 0 ? 0f : i / (float)steps;
+                int px = Mathf.RoundToInt(Mathf.Lerp(x0, x1, t));
+                int py = Mathf.RoundToInt(Mathf.Lerp(y0, y1, t));
+                for (int ox = -1; ox <= 1; ox++)
+                    for (int oy = -1; oy <= 1; oy++)
+                    {
+                        if (Mathf.Abs(ox) + Mathf.Abs(oy) == 2) continue; // diamond brush
+                        int X = px + ox, Y = py + oy;
+                        if (X < 0 || X > 255 || Y < 0 || Y > 255) continue;
+                        var cur = crackTex.GetPixel(X, Y);
+                        crackTex.SetPixel(X, Y, new Color(ink.r, ink.g, ink.b, Mathf.Max(cur.a, ink.a)));
+                    }
             }
         }
 
