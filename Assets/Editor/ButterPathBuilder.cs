@@ -383,6 +383,26 @@ namespace Crunchee.EditorTools
             return player;
         }
         /// <summary>
+        /// One-click iOS build for TestFlight: exports the Xcode project to
+        /// Builds/iOS (gitignored). Run the scene build first so the icon and
+        /// identity settings are baked in. Archive/upload happens in Xcode.
+        /// </summary>
+        [MenuItem("Crunchee/Build iOS (Xcode project)")]
+        public static void BuildIOS()
+        {
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/ButterPath.unity", true) };
+            var opts = new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/ButterPath.unity" },
+                locationPathName = "Builds/iOS",
+                target = BuildTarget.iOS,
+                options = BuildOptions.None,
+            };
+            var report = BuildPipeline.BuildPlayer(opts);
+            Debug.Log($"[Crunchee] iOS build result: {report.summary.result}, size {report.summary.totalSize} bytes, errors {report.summary.totalErrors}");
+        }
+
+        /// <summary>
         /// App icon (Icon G, picked by Faith Nov 3): applied when Assets/AppIcon.png
         /// is present in the project. Runs inside Build() so every scene rebuild
         /// keeps the icon wired.
