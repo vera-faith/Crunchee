@@ -126,26 +126,6 @@ namespace Crunchee.Audio
             return set.variants[Random.Range(0, set.variants.Length)];
         }
 
-        /// <summary>Finish celebration jingle: three rising squish bloops + a sugar sparkle.</summary>
-        public static void PlayFinish()
-        {
-            if (Instance == null) return;
-            Instance.StartCoroutine(Instance.FinishJingle());
-        }
-
-        System.Collections.IEnumerator FinishJingle()
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                int v = Random.Range(0, 3);
-                var clip = Synth($"squishstep{v}", () => AsmrSynth.SquishStep(Random.Range(1, 99999)));
-                PlayOne(baseSource, clip, 1.0f + i * 0.18f, 0.5f);
-                yield return new WaitForSeconds(0.09f);
-            }
-            var sparkle = Synth("sugar", () => AsmrSynth.SugarCrunch(Random.Range(1, 99999)));
-            PlayOne(coatingSource, sparkle, 1.15f, 0.45f);
-        }
-
         void PlayOne(AudioSource src, AudioClip clip, float pitch, float volume)
         {
             if (clip == null) return;

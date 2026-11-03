@@ -830,7 +830,7 @@ namespace Crunchee.EditorTools
             var art = arrow.rectTransform; art.anchorMin = art.anchorMax = new Vector2(0.5f, 0.5f); art.sizeDelta = new Vector2(140f, 140f);
             MakeLabel(canvasGo.transform, "JUMP", new Vector2(-150f, 78f), font, anchorRight: true);
 
-            // --- Progress pips (top center) + finish banner (big build) ---
+            // --- Progress pips (top center) ---
             var hud = canvasGo.AddComponent<ProgressHud>();
             var pips = new UnityEngine.UI.Image[10];
             for (int i = 0; i < 10; i++)
@@ -841,31 +841,6 @@ namespace Crunchee.EditorTools
                 pips[i] = pip.GetComponent<UnityEngine.UI.Image>();
             }
             hud.pips = pips;
-
-            var banner = new GameObject("FinishBanner");
-            banner.transform.SetParent(canvasGo.transform, false);
-            var brt = banner.AddComponent<RectTransform>();
-            brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f);
-            brt.anchoredPosition = new Vector2(0f, 130f);
-            brt.sizeDelta = new Vector2(620f, 230f);
-            var pill = MakeCircle(banner.transform, "Pill", Vector2.zero, 300f, new Color(1f, 0.62f, 0.72f, 0.92f));
-            pill.anchorMin = pill.anchorMax = new Vector2(0.5f, 0.5f);
-            pill.anchoredPosition = Vector2.zero;
-            pill.sizeDelta = new Vector2(620f, 210f);
-            var big = new GameObject("BannerTitle").AddComponent<Text>();
-            big.transform.SetParent(banner.transform, false);
-            big.text = "YOU DID IT!"; big.font = font; big.fontSize = 72; big.alignment = TextAnchor.MiddleCenter;
-            big.color = Color.white;
-            var bigRt = big.rectTransform; bigRt.anchorMin = bigRt.anchorMax = new Vector2(0.5f, 0.5f);
-            bigRt.anchoredPosition = new Vector2(0f, 34f); bigRt.sizeDelta = new Vector2(600f, 100f);
-            var small = new GameObject("BannerSub").AddComponent<Text>();
-            small.transform.SetParent(banner.transform, false);
-            small.text = "All 10 butters cracked!"; small.font = font; small.fontSize = 34; small.alignment = TextAnchor.MiddleCenter;
-            small.color = new Color(1f, 0.95f, 0.9f);
-            var smallRt = small.rectTransform; smallRt.anchorMin = smallRt.anchorMax = new Vector2(0.5f, 0.5f);
-            smallRt.anchoredPosition = new Vector2(0f, -42f); smallRt.sizeDelta = new Vector2(600f, 60f);
-            banner.SetActive(false);
-            hud.banner = banner;
             _ = controls;
         }
 
