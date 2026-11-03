@@ -44,7 +44,14 @@ namespace Crunchee.Core
         static Material shardMat;
         Texture2D crackTex;
         const int CrackW = 512, CrackH = 256;
-        static readonly Color CrackInk = new Color(0.15f, 0.09f, 0.07f, 0.9f);
+        // Wax-plate gap inks: shadowed depth, the butter showing through the
+        // split, and the bright broken edge of the wax itself.
+        static readonly Color GapShadow = new Color(0.45f, 0.28f, 0.1f, 0.55f);
+        static readonly Color GapButter = new Color(0.99f, 0.8f, 0.34f, 0.9f);
+        static readonly Color GapEdge = new Color(1f, 1f, 1f, 0.85f);
+        readonly List<Vector2> crackNodes = new List<Vector2>();
+        readonly HashSet<long> crackEdges = new HashSet<long>();
+        int sparkleCounter;
         Vector2 trailPx; bool hasTrail;
         Material dentMat; Vector3 dentBaseScale; float dentShown;
         Vector3 trackPos; float trackTime = -10f;
@@ -232,10 +239,13 @@ namespace Crunchee.Core
             }
         }
 
-        // --- Crack drawing (Faith, Nov 3, from the reference videos): cracks are
-        // BOLD dark jagged strokes forming a connected network - a big branching
-        // burst on landing, then a continuous trail connecting every step, so
-        // all of her movement shows on the wax. Not faint random marks. ---
+        // --- Crack drawing (Faith, Nov 3 round 3, from the reference videos):
+        // the cracks are the WAX LAYER ITSELF splitting into polygonal plates.
+        // Nodes land on the surface and connect with straight borders; every
+        // border is drawn as a gap in the wax - shadowed depth, golden butter
+        // showing through, and a bright rim where the wax edge broke. Walking
+        // adds nodes along her real path, so the plates get SMALLER the more
+        // she walks. Nothing is placed at random. ---
 
         Vector2 WorldToCrackPx(Vector3 worldPos)
         {
@@ -245,7 +255,7 @@ namespace Crunchee.Core
 
         bool InCrackRange(Vector2 p) => p.x > -24f && p.x < CrackW + 24f && p.y > -24f && p.y < CrackH + 24f;
 
-        void StampPx(float x, float y, float radius, float alphaScale)
+        void StampPx(float x, float y, float radius, Color ink)
         {
             int r = Mathf.CeilToInt(radius);
             int cx = Mathf.RoundToInt(x), cy = Mathf.RoundToInt(y);
@@ -256,90 +266,132 @@ namespace Crunchee.Core
                     if (d > radius) continue;
                     int X = cx + ox, Y = cy + oy;
                     if (X < 0 || X >= CrackW || Y < 0 || Y >= CrackH) continue;
-                    float fall = 1f - d / Mathf.Max(0.001f, radius);
-                    float a = CrackInk.a * alphaScale * (0.5f + 0.5f * fall);
+                    float fall = 1f - (d / Mathf.Max(0.001f, radius)) * 0.55f;
+                    float a = Mathf.Min(1f, ink.a * fall);
                     var cur = crackTex.GetPixel(X, Y);
-                    crackTex.SetPixel(X, Y, new Color(CrackInk.r, CrackInk.g, CrackInk.b, Mathf.Max(cur.a, a)));
+                    cur.r = Mathf.Lerp(cur.r, ink.r, a);
+                    cur.g = Mathf.Lerp(cur.g, ink.g, a);
+                    cur.b = Mathf.Lerp(cur.b, ink.b, a);
+                    cur.a = Mathf.Max(cur.a, a);
+                    crackTex.SetPixel(X, Y, cur);
                 }
         }
 
-        void StampLine(Vector2 a, Vector2 b, float coreRadius)
+        void DrawGapPass(Vector2 a, Vector2 b, Color ink, float radius)
         {
-            int steps = Mathf.CeilToInt(Vector2.Distance(a, b) / 2f);
-            for (int pass = 0; pass < 2; pass++)
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / 2f));
+            for (int i = 0; i <= steps; i++)
             {
-                float r = pass == 0 ? coreRadius * 2.0f : coreRadius;   // soft dark halo, then firm core
-                float aScale = pass == 0 ? 0.30f : 1f;
-                for (int i = 0; i <= steps; i++)
-                {
-                    var p = Vector2.Lerp(a, b, steps == 0 ? 0f : i / (float)steps);
-                    StampPx(p.x, p.y, r, aScale);
-                }
+                var p = Vector2.Lerp(a, b, i / (float)steps);
+                StampPx(p.x, p.y, radius, ink);
             }
         }
 
-        void DrawCrackSeg(Vector2 a, Vector2 b, float coreRadius)
+        /// <summary>One plate border: a wide shadowed gap, butter inside it, white wax rim.</summary>
+        void DrawPlateGap(Vector2 a, Vector2 b)
         {
             float len = Vector2.Distance(a, b);
-            int n = Mathf.Max(1, Mathf.RoundToInt(len / 10f));
-            var dir = len > 0.01f ? (b - a) / len : Vector2.right;
-            var perp = new Vector2(-dir.y, dir.x);
-            var prev = a;
-            for (int i = 1; i <= n; i++)
-            {
-                var p = Vector2.Lerp(a, b, i / (float)n);
-                if (i < n) p += perp * Random.Range(-4f, 4f); // jagged wander
-                StampLine(prev, p, coreRadius);
-                prev = p;
-            }
+            if (len < 2f) return;
+            var mid = (a + b) * 0.5f;
+            var nrm = new Vector2(-(b.y - a.y), b.x - a.x) / len;
+            mid += nrm * Random.Range(-len * 0.045f, len * 0.045f); // nearly straight, slight irregularity
+            DrawGapPass(a, mid, GapShadow, 4.6f); DrawGapPass(mid, b, GapShadow, 4.6f);
+            DrawGapPass(a, mid, GapButter, 2.6f); DrawGapPass(mid, b, GapButter, 2.6f);
+            var off = new Vector2(1.7f, 1.7f);
+            DrawGapPass(a + off, mid + off, GapEdge, 1.1f); DrawGapPass(mid + off, b + off, GapEdge, 1.1f);
         }
 
-        /// <summary>The landing burst: 9 long jagged branches + sub-branches, a real crack network.</summary>
+        void StampSparkle(Vector2 c)
+        {
+            var star = new Color(1f, 1f, 1f, 0.95f);
+            for (int i = -3; i <= 3; i++)
+            {
+                if (i == 0) continue;
+                StampPx(c.x + i * 2f, c.y, 0.9f, star);
+                StampPx(c.x, c.y + i * 2f, 0.9f, star);
+            }
+            StampPx(c.x, c.y, 1.7f, star);
+        }
+
+        int AddNode(Vector2 p)
+        {
+            p.x = Mathf.Clamp(p.x, 8f, CrackW - 9f);
+            p.y = Mathf.Clamp(p.y, 8f, CrackH - 9f);
+            crackNodes.Add(p);
+            return crackNodes.Count - 1;
+        }
+
+        static long EdgeKey(int a, int b) => a < b ? (long)a * 4096 + b : (long)b * 4096 + a;
+
+        void ConnectNodes(int a, int b)
+        {
+            if (a == b || !crackEdges.Add(EdgeKey(a, b))) return;
+            DrawPlateGap(crackNodes[a], crackNodes[b]);
+        }
+
+        /// <summary>
+        /// The landing: the wax under her shatters into a ring of polygonal
+        /// plates - spokes from the impact point plus a connected ring, with a
+        /// few longer spokes reaching out (the video's cracked-plate look).
+        /// </summary>
         public void AddNetworkCrack(Vector3 worldPos, float radiusWorld)
         {
             if (crackTex == null || crackDecal == null) return;
             var c = WorldToCrackPx(worldPos);
             if (!InCrackRange(c)) { hasTrail = false; return; }
-            for (int i = 0; i < 9; i++)
+            crackNodes.Clear(); crackEdges.Clear();
+            float pxPerUnit = Vector2.Distance(c, WorldToCrackPx(worldPos + Vector3.right));
+            float rad1 = radiusWorld * pxPerUnit * 0.55f;
+            int ci = AddNode(c);
+            const int R1 = 7;
+            var ring = new int[R1];
+            float baseAng = Random.Range(0f, Mathf.PI * 2f);
+            for (int i = 0; i < R1; i++)
             {
-                float ang = i / 9f * Mathf.PI * 2f + Random.Range(-0.3f, 0.3f);
-                float len = radiusWorld * Random.Range(0.65f, 1.1f);
-                var dirW = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
-                DrawCrackSeg(c, WorldToCrackPx(worldPos + dirW * len), 3.1f);
-                float bang = ang + Random.Range(0.5f, 1.0f) * (Random.value < 0.5f ? -1f : 1f);
-                var midW = worldPos + dirW * len * 0.55f;
-                var bendW = midW + new Vector3(Mathf.Cos(bang), 0f, Mathf.Sin(bang)) * len * 0.4f;
-                DrawCrackSeg(WorldToCrackPx(midW), WorldToCrackPx(bendW), 2.1f);
+                float ang = baseAng + i * (Mathf.PI * 2f / R1) + Random.Range(-0.16f, 0.16f);
+                float rr = rad1 * Random.Range(0.85f, 1.15f);
+                ring[i] = AddNode(c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr);
             }
-            StampPx(c.x, c.y, 7f, 1f); // chipped center
+            for (int i = 0; i < R1; i++)
+            {
+                ConnectNodes(ci, ring[i]);                    // spokes
+                ConnectNodes(ring[i], ring[(i + 1) % R1]);    // the ring closes the plates
+            }
+            for (int i = 0; i < R1; i += 2)                   // longer reach on a few spokes
+            {
+                float ang = baseAng + i * (Mathf.PI * 2f / R1) + 0.45f;
+                int outer = AddNode(c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rad1 * 1.9f);
+                ConnectNodes(ring[i], outer);
+            }
+            StampSparkle(c);
             crackTex.Apply();
             trailPx = c; hasTrail = true;
         }
 
-        /// <summary>Connect this step to the last one with a bold jagged crack line.</summary>
+        /// <summary>
+        /// Each step drops a node on her path and ties it to the two nearest
+        /// nodes, so the plate network grows along exactly where she walks -
+        /// re-walked areas subdivide into smaller and smaller pieces.
+        /// </summary>
         public void AddTrailCrack(Vector3 worldPos)
         {
             if (crackTex == null || crackDecal == null) return;
             var p = WorldToCrackPx(worldPos);
             if (!InCrackRange(p)) { hasTrail = false; return; }
-            if (hasTrail && Vector2.Distance(p, trailPx) < 140f)
+            if (hasTrail && Vector2.Distance(p, trailPx) < 15f) { trailPx = p; return; } // tiny shuffle: no new plate
+            if (crackNodes.Count > 240) { trailPx = p; hasTrail = true; return; }
+            int ni = AddNode(p);
+            int n1 = -1, n2 = -1; float d1 = 115f, d2 = 115f;
+            for (int i = 0; i < crackNodes.Count - 1; i++)
             {
-                DrawCrackSeg(trailPx, p, 2.6f);
-                // Web cracks: short connectors sprayed around each step, so the
-                // surface keeps subdividing into SMALLER pieces the more she
-                // walks on it (Faith, Nov 3).
-                for (int wI = 0; wI < 2; wI++)
-                {
-                    float ang = Random.Range(0f, Mathf.PI * 2f);
-                    DrawCrackSeg(p, p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(24f, 46f), 1.6f);
-                }
-                if (Random.value < 0.8f) // short branchlet off the trail
-                {
-                    float ang = Random.Range(0f, Mathf.PI * 2f);
-                    DrawCrackSeg(p, p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * Random.Range(10f, 22f), 1.7f);
-                }
-                crackTex.Apply();
+                float d = Vector2.Distance(p, crackNodes[i]);
+                if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = i; }
+                else if (d < d2) { d2 = d; n2 = i; }
             }
+            if (n1 >= 0) ConnectNodes(ni, n1);
+            if (n2 >= 0) ConnectNodes(ni, n2);
+            if ((sparkleCounter++ % 4) == 0) StampSparkle(p);
+            crackTex.Apply();
             trailPx = p; hasTrail = true;
         }
 

@@ -287,17 +287,16 @@ namespace Crunchee.EditorTools
         /// </summary>
         static GameObject BuildPuddingBunny(Vector3 at)
         {
-            var pudding = Mat("Pudding", new Color(1f, 0.9f, 0.66f), 1f, 1f);
-            var cream = Mat("Cream", new Color(1f, 0.96f, 0.85f), 1f, 1f);
-            var caramel = Mat("Caramel", new Color(0.83f, 0.48f, 0.16f), 1f, 1f);
-            var dark = Mat("FaceDark", new Color(0.2f, 0.11f, 0.07f), 1f, 0.35f);
+            // Built to the LOCKED concept art (Faith, Nov 3): a one-piece flan -
+            // wide flat-fronted head flowing into a big round belly, thick glossy
+            // caramel poured over the head AND shoulders with long drips, very
+            // long plain pudding ears hanging straight down, and a tiny simple
+            // face (small brown dot eyes, tiny smile, soft blush). No extras.
+            var pudding = Mat("Pudding", new Color(1f, 0.89f, 0.7f), 1f, 1f);
+            var caramel = Mat("Caramel", new Color(0.85f, 0.47f, 0.13f), 1f, 1f);
+            var brown = Mat("FaceBrown", new Color(0.3f, 0.17f, 0.08f), 1f, 0.35f);
             var white = Mat("EyeShine", new Color(1f, 1f, 1f), 1f, 0.3f);
-            var pink = Mat("Blush", new Color(1f, 0.55f, 0.62f), 0.85f, 0.6f);
-            var innerEar = Mat("InnerEar", new Color(1f, 0.72f, 0.76f), 1f, 0.7f);
-            var mouth = Mat("Mouth", new Color(0.45f, 0.16f, 0.14f), 1f, 0.5f);
-            var tongue = Mat("Tongue", new Color(1f, 0.55f, 0.6f), 1f, 0.6f);
-            var cherryRed = Mat("CherryTop", new Color(0.92f, 0.12f, 0.22f), 1f, 0.95f);
-            var stemMat = Mat("Stem", new Color(0.4f, 0.25f, 0.12f), 1f, 0.5f);
+            var blushM = Mat("Blush", new Color(1f, 0.62f, 0.66f), 0.55f, 0.6f);
 
             var player = new GameObject("Player_PuddingBunny");
             player.transform.position = at;
@@ -306,60 +305,50 @@ namespace Crunchee.EditorTools
             var model = new GameObject("Model"); model.transform.SetParent(player.transform, false);
             model.AddComponent<SquashAndStretch>();
 
-            // Flan skirt (wide base, like a flan on a plate) + body + caramel + belly
-            Part(PrimitiveType.Sphere, model.transform, "Skirt", new Vector3(0f, 0.17f, 0f), new Vector3(0.68f, 0.3f, 0.64f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "SkirtBand", new Vector3(0f, 0.27f, 0f), new Vector3(0.7f, 0.09f, 0.66f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.33f, 0f), new Vector3(0.6f, 0.48f, 0.56f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "BodyCaramel", new Vector3(0f, 0.48f, 0f), new Vector3(0.62f, 0.2f, 0.58f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "Belly", new Vector3(0f, 0.33f, 0.2f), new Vector3(0.38f, 0.34f, 0.16f), cream);
-            // Little arms (angled out) + feet with pink toe pads
+            // One-piece flan: big round belly + wide flat-fronted head (cylinder
+            // gives the concept's flatter face, so drips and face sit right)
+            Part(PrimitiveType.Sphere, model.transform, "Body", new Vector3(0f, 0.3f, 0f), new Vector3(0.8f, 0.74f, 0.72f), pudding);
+            Part(PrimitiveType.Cylinder, model.transform, "Head", new Vector3(0f, 0.88f, 0f), new Vector3(0.84f, 0.31f, 0.78f), pudding);
+            Part(PrimitiveType.Sphere, model.transform, "HeadTop", new Vector3(0f, 1.14f, 0f), new Vector3(0.8f, 0.3f, 0.74f), pudding);
+            // Thick caramel poured over the head, with LONG drips down the face
+            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.1f, 0f), new Vector3(0.9f, 0.46f, 0.8f), caramel);
+            foreach (var side in new[] { -1f, 1f })
+                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(side * 0.28f, 0.74f, 0.29f), new Vector3(0.11f, 0.4f, 0.09f), caramel);
+            Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(0.03f, 0.78f, 0.35f), new Vector3(0.1f, 0.3f, 0.09f), caramel);
+            foreach (var side in new[] { -1f, 1f })
+                Part(PrimitiveType.Sphere, model.transform, "DripSide", new Vector3(side * 0.4f, 0.82f, 0.05f), new Vector3(0.09f, 0.3f, 0.11f), caramel);
+            // Caramel poured over the shoulders too, scalloped drip edge in front
+            Part(PrimitiveType.Sphere, model.transform, "CaramelPour", new Vector3(0f, 0.56f, 0f), new Vector3(0.86f, 0.34f, 0.78f), caramel);
+            foreach (var sx in new[] { -0.3f, -0.15f, 0f, 0.15f, 0.3f })
+            {
+                float zz = 0.35f - Mathf.Abs(sx) * 0.36f;
+                float yy = 0.42f - Mathf.Abs(sx) * 0.2f;
+                Part(PrimitiveType.Sphere, model.transform, "Scallop", new Vector3(sx, yy, zz), new Vector3(0.13f, 0.17f, 0.09f), caramel);
+            }
+            // Very long plain ears hanging straight down beside the head
             foreach (var side in new[] { -1f, 1f })
             {
-                var arm = Part(PrimitiveType.Sphere, model.transform, "Arm", new Vector3(side * 0.31f, 0.36f, 0.06f), new Vector3(0.13f, 0.19f, 0.13f), pudding);
-                arm.transform.rotation = Quaternion.Euler(0f, 0f, -side * 18f);
-                Part(PrimitiveType.Sphere, model.transform, "Foot", new Vector3(side * 0.17f, 0.05f, 0.18f), new Vector3(0.23f, 0.1f, 0.34f), pudding);
-                Part(PrimitiveType.Sphere, model.transform, "ToePad", new Vector3(side * 0.17f, 0.085f, 0.32f), new Vector3(0.085f, 0.035f, 0.06f), innerEar);
+                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.45f, 0.74f, -0.02f), new Vector3(0.17f, 0.48f, 0.13f), pudding);
+                ear.transform.rotation = Quaternion.Euler(0f, 0f, -side * 5f);
             }
-            // Curled tail (two puffs)
-            Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.28f), new Vector3(0.19f, 0.19f, 0.19f), pudding);
-            Part(PrimitiveType.Sphere, model.transform, "TailCurl", new Vector3(0.03f, 0.43f, -0.31f), new Vector3(0.12f, 0.12f, 0.12f), pudding);
-
-            // BIG round head (v4: bigger still, chibi proportions)
-            Part(PrimitiveType.Sphere, model.transform, "Head", new Vector3(0f, 0.9f, 0f), new Vector3(0.76f, 0.68f, 0.7f), pudding);
-            // Caramel poured over the head + swirl dollop + a cherry on top
-            Part(PrimitiveType.Sphere, model.transform, "CaramelCap", new Vector3(0f, 1.09f, 0f), new Vector3(0.79f, 0.38f, 0.73f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "Swirl", new Vector3(0f, 1.28f, 0f), new Vector3(0.21f, 0.14f, 0.21f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "SwirlTip", new Vector3(0.02f, 1.38f, 0f), new Vector3(0.11f, 0.1f, 0.11f), caramel);
-            Part(PrimitiveType.Sphere, model.transform, "Cherry", new Vector3(0.03f, 1.47f, 0f), new Vector3(0.1f, 0.1f, 0.1f), cherryRed);
-            var stem = Part(PrimitiveType.Cylinder, model.transform, "CherryStem", new Vector3(0.06f, 1.56f, 0f), new Vector3(0.025f, 0.14f, 0.025f), stemMat);
-            stem.transform.rotation = Quaternion.Euler(0f, 0f, -22f);
-            // Cream hair tuft beside the swirl
-            Part(PrimitiveType.Sphere, model.transform, "Tuft", new Vector3(0.17f, 1.2f, 0.14f), new Vector3(0.15f, 0.1f, 0.13f), cream);
-            foreach (var dx in new[] { -0.22f, 0.02f, 0.25f })
-                Part(PrimitiveType.Sphere, model.transform, "Drip", new Vector3(dx, 1.0f - Mathf.Abs(dx) * 0.2f, 0.32f), new Vector3(0.1f, 0.24f, 0.09f), caramel);
-            // Longer floppier ears with pink inners + caramel-dipped tips
+            // Tiny simple face: small brown dot eyes (one sparkle each), a tiny
+            // smile line, soft round blush low on the cheeks
             foreach (var side in new[] { -1f, 1f })
             {
-                var ear = Part(PrimitiveType.Capsule, model.transform, "Ear", new Vector3(side * 0.35f, 0.86f, -0.03f), new Vector3(0.2f, 0.62f, 0.11f), pudding);
-                ear.transform.rotation = Quaternion.Euler(6f, 0f, side * 14f);
-                var inner = Part(PrimitiveType.Sphere, model.transform, "InnerEar", new Vector3(side * 0.36f, 0.81f, 0.05f), new Vector3(0.11f, 0.34f, 0.04f), innerEar);
-                inner.transform.rotation = ear.transform.rotation;
-                var tip = Part(PrimitiveType.Sphere, model.transform, "EarTip", new Vector3(side * 0.44f, 0.44f, -0.07f), new Vector3(0.19f, 0.24f, 0.1f), caramel);
-                tip.transform.rotation = ear.transform.rotation;
+                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.17f, 0.84f, 0.35f), new Vector3(0.075f, 0.1f, 0.04f), brown);
+                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.17f + 0.016f, 0.875f, 0.365f), new Vector3(0.024f, 0.034f, 0.02f), white);
+                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.31f, 0.76f, 0.255f), new Vector3(0.13f, 0.085f, 0.03f), blushM);
             }
-            // Face: BIG shiny eyes (two highlights each), cream muzzle cheeks,
-            // tiny nose, open smile + tongue, soft rosy blush
+            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.73f, 0.382f), new Vector3(0.1f, 0.028f, 0.02f), brown);
+            // Stubby arms at her sides, little legs + round feet, tiny tail
             foreach (var side in new[] { -1f, 1f })
             {
-                Part(PrimitiveType.Sphere, model.transform, "Eye", new Vector3(side * 0.15f, 0.92f, 0.325f), new Vector3(0.12f, 0.17f, 0.05f), dark);
-                Part(PrimitiveType.Sphere, model.transform, "EyeShine", new Vector3(side * 0.15f - 0.032f, 0.97f, 0.372f), new Vector3(0.045f, 0.06f, 0.02f), white);
-                Part(PrimitiveType.Sphere, model.transform, "EyeShine2", new Vector3(side * 0.15f + 0.028f, 0.885f, 0.375f), new Vector3(0.022f, 0.032f, 0.02f), white);
-                Part(PrimitiveType.Sphere, model.transform, "Cheek", new Vector3(side * 0.17f, 0.78f, 0.285f), new Vector3(0.18f, 0.14f, 0.13f), cream);
-                Part(PrimitiveType.Sphere, model.transform, "Blush", new Vector3(side * 0.29f, 0.81f, 0.285f), new Vector3(0.15f, 0.085f, 0.03f), pink);
+                var arm = Part(PrimitiveType.Capsule, model.transform, "Arm", new Vector3(side * 0.44f, 0.3f, 0.04f), new Vector3(0.13f, 0.3f, 0.13f), pudding);
+                arm.transform.rotation = Quaternion.Euler(0f, 0f, -side * 8f);
+                Part(PrimitiveType.Sphere, model.transform, "Leg", new Vector3(side * 0.17f, 0.14f, 0.05f), new Vector3(0.17f, 0.15f, 0.17f), pudding);
+                Part(PrimitiveType.Sphere, model.transform, "Foot", new Vector3(side * 0.17f, 0.05f, 0.09f), new Vector3(0.2f, 0.11f, 0.26f), pudding);
             }
-            Part(PrimitiveType.Sphere, model.transform, "Nose", new Vector3(0f, 0.86f, 0.365f), new Vector3(0.065f, 0.05f, 0.03f), tongue);
-            Part(PrimitiveType.Sphere, model.transform, "Mouth", new Vector3(0f, 0.775f, 0.35f), new Vector3(0.12f, 0.09f, 0.04f), mouth);
-            Part(PrimitiveType.Sphere, model.transform, "Tongue", new Vector3(0f, 0.745f, 0.36f), new Vector3(0.07f, 0.055f, 0.03f), tongue);
+            Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.34f), new Vector3(0.17f, 0.17f, 0.17f), pudding);
             return player;
         }
 
