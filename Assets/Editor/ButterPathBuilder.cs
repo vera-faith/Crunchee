@@ -411,8 +411,8 @@ namespace Crunchee.EditorTools
         {
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon.png");
             if (icon == null) { Debug.Log("[Crunchee] No Assets/AppIcon.png - icon skipped."); return; }
-            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.iOS, IconKind.Application, new[] { icon });
-            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Standalone, IconKind.Application, new[] { icon });
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.iOS, new[] { icon }, IconKind.Application);
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Standalone, new[] { icon }, IconKind.Application);
             Debug.Log("[Crunchee] App icon applied from Assets/AppIcon.png.");
         }
 
