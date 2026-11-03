@@ -184,6 +184,7 @@ namespace Crunchee.EditorTools
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;
+            SetAppIcon();
 
             if (!AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.CreateFolder("Assets", "Scenes");
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/ButterPath.unity");
@@ -381,6 +382,20 @@ namespace Crunchee.EditorTools
             Part(PrimitiveType.Sphere, model.transform, "Tail", new Vector3(0f, 0.3f, -0.34f), new Vector3(0.17f, 0.17f, 0.17f), pudding);
             return player;
         }
+        /// <summary>
+        /// App icon (Icon G, picked by Faith Nov 3): applied when Assets/AppIcon.png
+        /// is present in the project. Runs inside Build() so every scene rebuild
+        /// keeps the icon wired.
+        /// </summary>
+        static void SetAppIcon()
+        {
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon.png");
+            if (icon == null) { Debug.Log("[Crunchee] No Assets/AppIcon.png - icon skipped."); return; }
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.iOS, IconKind.Application, new[] { icon });
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Standalone, IconKind.Application, new[] { icon });
+            Debug.Log("[Crunchee] App icon applied from Assets/AppIcon.png.");
+        }
+
         static GameObject Part(PrimitiveType t, Transform parent, string name, Vector3 localPos, Vector3 scale, Material m)
         {
             var go = GameObject.CreatePrimitive(t);
