@@ -230,5 +230,103 @@ namespace Crunchee.Audio
             }
             return ToClip("Synth_WaxStep", d);
         }
+
+        // --- Background music (Faith, Nov 3): a dreamy, cute, twinkly loop in
+        // the reference videos' spirit - but an ORIGINAL composition, written
+        // note by note here like every other sound in the game. Music-box
+        // melody over soft pad chords and a gentle bass, C major, I-IV-vi-V
+        // twice, 16 seconds, seamless (note tails wrap around the loop point).
+        static float MidiHz(float midi) => 440f * Mathf.Pow(2f, (midi - 69f) / 12f);
+
+        static void AddPadTone(float[] buf, float midi, double start, double len)
+        {
+            int n = buf.Length;
+            int s0 = (int)(start * SR);
+            int count = (int)(len * SR);
+            double f = MidiHz(midi);
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                double x = t / len;
+                // slow swell in, gentle release out - chords breathe per bar
+                double env = System.Math.Min(1.0, t / 0.5) * (x > 0.62 ? System.Math.Pow(1.0 - (x - 0.62) / 0.38, 1.4) : 1.0);
+                double ph = 2 * System.Math.PI * f * t;
+                double v = (System.Math.Sin(ph) * 0.045 + System.Math.Sin(ph * 1.002) * 0.02) * env;
+                buf[(s0 + i) % n] += (float)v;
+            }
+        }
+
+        static void AddBoxNote(float[] buf, float midi, double start, float amp)
+        {
+            int n = buf.Length;
+            int s0 = (int)(start * SR);
+            int count = (int)(1.4 * SR);
+            double f = MidiHz(midi);
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                double env = System.Math.Exp(-t * 3.1) * System.Math.Min(1.0, t / 0.004);
+                double v = (System.Math.Sin(2 * System.Math.PI * f * t)
+                          + 0.42 * System.Math.Sin(2 * System.Math.PI * f * 2.0 * t)
+                          + 0.16 * System.Math.Sin(2 * System.Math.PI * f * 3.01 * t)) * env * amp;
+                buf[(s0 + i) % n] += (float)v;
+            }
+        }
+
+        static void AddBassNote(float[] buf, float midi, double start)
+        {
+            int n = buf.Length;
+            int s0 = (int)(start * SR);
+            int count = (int)(1.8 * SR);
+            double f = MidiHz(midi);
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                double env = System.Math.Exp(-t * 2.2) * System.Math.Min(1.0, t / 0.01);
+                buf[(s0 + i) % n] += (float)(System.Math.Sin(2 * System.Math.PI * f * t) * 0.055 * env);
+            }
+        }
+
+        public static AudioClip DreamyMusicBox()
+        {
+            const double beat = 0.5, bar = 4 * beat; // 120bpm feel, 8 bars = 16 s
+            var buf = new float[(int)(bar * 8 * SR)];
+            // Chords as midi tones: dreamy open voicings with 7th color.
+            float[][] chords =
+            {
+                new float[] { 48, 55, 64, 71 }, // C
+                new float[] { 53, 57, 64, 69 }, // F
+                new float[] { 45, 52, 60, 64 }, // Am
+                new float[] { 47, 55, 62, 67 }, // G
+                new float[] { 48, 55, 64, 71 }, // C
+                new float[] { 53, 57, 64, 69 }, // F
+                new float[] { 45, 52, 60, 64 }, // Am
+                new float[] { 47, 55, 62, 67 }, // G
+            };
+            float[] bassRoots = { 36, 41, 33, 31, 36, 41, 33, 31 };
+            for (int b = 0; b < 8; b++)
+            {
+                double at = b * bar;
+                foreach (var tone in chords[b]) AddPadTone(buf, tone, at, bar + 0.4);
+                AddBassNote(buf, bassRoots[b], at);
+            }
+            // The melody: an original music-box line (bar, beat-in-bar, midi).
+            var melody = new (int bar, float beat, float midi)[]
+            {
+                (0, 0.0f, 76), (0, 0.5f, 79), (0, 1.0f, 81), (0, 1.5f, 79), (0, 2.0f, 76), (0, 3.0f, 74),
+                (1, 0.0f, 77), (1, 0.5f, 81), (1, 1.0f, 84), (1, 1.5f, 81), (1, 2.0f, 77), (1, 3.0f, 76),
+                (2, 0.0f, 76), (2, 0.5f, 81), (2, 1.0f, 84), (2, 1.5f, 81), (2, 2.0f, 79), (2, 3.0f, 76),
+                (3, 0.0f, 74), (3, 0.5f, 79), (3, 1.0f, 83), (3, 1.5f, 79), (3, 2.5f, 74), (3, 3.0f, 71),
+                (4, 0.0f, 72), (4, 0.5f, 76), (4, 1.0f, 79), (4, 2.0f, 81), (4, 3.0f, 79),
+                (5, 0.0f, 81), (5, 0.5f, 84), (5, 1.0f, 81), (5, 1.5f, 77), (5, 2.0f, 76), (5, 3.0f, 74),
+                (6, 0.0f, 76), (6, 1.0f, 79), (6, 1.5f, 81), (6, 2.0f, 84), (6, 3.0f, 81),
+                (7, 0.0f, 79), (7, 0.5f, 74), (7, 1.0f, 72), (7, 2.0f, 76), (7, 3.0f, 72),
+            };
+            foreach (var (b, bt, m) in melody) AddBoxNote(buf, m, b * bar + bt * beat, 0.13f);
+            // Twinkles: tiny high sparkles late in even bars.
+            foreach (var (b, m) in new (int, float)[] { (1, 91), (3, 88), (5, 91), (7, 88) })
+                AddBoxNote(buf, m, b * bar + 3.5 * beat, 0.035f);
+            return ToClip("Synth_MusicBox", buf);
+        }
     }
 }

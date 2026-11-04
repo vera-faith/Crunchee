@@ -22,7 +22,7 @@ namespace Crunchee.Audio
         public ClipSet[] baseClips;     // index = (int)BaseMaterial
         public ClipSet[] coatingClips;  // index = (int)Coating (Plain = empty/none)
 
-        AudioSource baseSource, coatingSource;
+        AudioSource baseSource, coatingSource, musicSource;
         readonly Dictionary<string, AudioClip> synthCache = new Dictionary<string, AudioClip>();
 
         void Awake()
@@ -33,6 +33,18 @@ namespace Crunchee.Audio
             coatingSource = gameObject.AddComponent<AudioSource>();
             foreach (var s in new[] { baseSource, coatingSource })
             { s.playOnAwake = false; s.spatialBlend = 0.35f; }
+            // Dreamy background music (Faith, Nov 3): its own flat source so
+            // the ASMR layers stay spatial and punchy on top of it.
+            musicSource = gameObject.AddComponent<AudioSource>();
+            musicSource.playOnAwake = false; musicSource.loop = true;
+            musicSource.spatialBlend = 0f; musicSource.volume = 0.3f;
+        }
+
+        void Start()
+        {
+            if (musicSource == null || musicSource.clip != null) return;
+            musicSource.clip = Synth("musicbox", () => AsmrSynth.DreamyMusicBox());
+            musicSource.Play();
         }
 
         public static void PlaySquish(BaseMaterial b, Coating c, Vector3 pos, int waxLayers = 1)
