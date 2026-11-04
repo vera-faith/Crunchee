@@ -14,19 +14,23 @@ namespace Crunchee.Player
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
-        public float moveSpeed = 5f;
+        public float moveSpeed = 3.6f;
         public float jumpForce = 9f;
         public float gravity = -22f;
+        public float turnSpeed = 2.6f;   // rad/s cap on turning - a full about-face takes over a second, in a wide smooth arc
+        public float inputSmooth = 4.5f; // the smoothed input chases the stick SLOWLY - long gentle acceleration + glide to a stop (Faith, Nov 3: "still too sensitive, has to be a lot smoother")
         public Transform cameraRig;
 
         CharacterController cc;
         Vector3 velocity;
         SquashAndStretch squash;
         Vector2 dragInput;
+        Vector2 smoothInput; // dragInput eased over time, so starts/stops/direction changes ramp instead of jerking
         Squishy groundSquishy;
         bool wasGrounded;
         float distOnSquishy;
         Vector3 lastPos;
+        Vector3 spawnPos;
 
         void Awake()
         {
@@ -34,6 +38,7 @@ namespace Crunchee.Player
             cc.stepOffset = 0.6f; // tall enough to walk up onto the next squishy in the climb
             squash = GetComponentInChildren<SquashAndStretch>();
             lastPos = transform.position;
+            spawnPos = transform.position;
         }
 
         void Update()
@@ -41,7 +46,10 @@ namespace Crunchee.Player
             ReadInput();
             Vector3 camF = cameraRig ? Vector3.ProjectOnPlane(cameraRig.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 camR = Vector3.Cross(Vector3.up, camF);
-            Vector3 move = (camF * dragInput.y + camR * dragInput.x) * moveSpeed;
+            // Ease the input: full stick no longer means instant full speed
+            // or an instant direction flip (the "whip" Faith reported).
+            smoothInput = Vector2.Lerp(smoothInput, dragInput, 1f - Mathf.Exp(-inputSmooth * Time.deltaTime));
+            Vector3 move = (camF * smoothInput.y + camR * smoothInput.x) * moveSpeed;
 
             bool grounded = cc.isGrounded;
             if (grounded && velocity.y < 0f) velocity.y = -2f;
@@ -55,8 +63,25 @@ namespace Crunchee.Player
             velocity.y += gravity * Time.deltaTime;
             cc.Move((move + velocity) * Time.deltaTime);
 
+            // Safety net: never fall forever. If she somehow leaves the
+            // world, put her back at the start (Nov 3: the room floor had no
+            // collider and she fell 41,720 units into the void).
+            if (transform.position.y < -5f)
+            {
+                ReleaseSquishy();
+                velocity = Vector3.zero;
+                smoothInput = Vector2.zero;
+                cc.enabled = false;
+                transform.position = spawnPos;
+                cc.enabled = true;
+            }
+
             if (!jumping) UpdateSquishyContact();
-            if (move.sqrMagnitude > 0.01f) transform.forward = Vector3.Slerp(transform.forward, move.normalized, 12f * Time.deltaTime);
+            // Turn at a capped rate along the smoothed movement direction -
+            // a flick of the stick becomes a smooth arc, and the camera
+            // behind her swings gently instead of whipping around.
+            if (move.sqrMagnitude > 0.04f)
+                transform.forward = Vector3.RotateTowards(transform.forward, move.normalized, turnSpeed * Time.deltaTime, 0f);
             wasGrounded = cc.isGrounded;
         }
 
