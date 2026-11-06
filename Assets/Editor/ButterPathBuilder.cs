@@ -112,16 +112,8 @@ namespace Crunchee.EditorTools
             // Butter: soft pale-yellow blocks (Faith's reference image), squishy dent on.
             // _EnvStrength low: glossy butter that doesn't mirror the cloudy
             // sunset skybox (cloud reflections read as camo blotches, Nov 6).
-            var butterMat = Mat("Butter", new Color(0.99f, 0.88f, 0.6f), 1f, 0.7f);
-            butterMat.mainTexture = ButterSwirlTexture();
-            butterMat.SetFloat("_DentAmount", 1f);
-            butterMat.SetFloat("_RimStrength", 0.2f);
-            butterMat.SetFloat("_EnvStrength", 0.2f);
-            var patMat = Mat("ButterPat", new Color(1f, 0.9f, 0.63f), 1f, 0.75f);
-            patMat.mainTexture = ButterSwirlTexture();
-            patMat.SetFloat("_DentAmount", 1f);
-            patMat.SetFloat("_RimStrength", 0.2f);
-            patMat.SetFloat("_EnvStrength", 0.2f);
+            var butterMat = ButterBodyMat("Butter", new Color(0.99f, 0.86f, 0.43f), 0.7f);
+            var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.92f, 0.55f), 0.75f);
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
 
