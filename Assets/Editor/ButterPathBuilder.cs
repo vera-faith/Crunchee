@@ -46,6 +46,10 @@ namespace Crunchee.EditorTools
             var sh = Shader.Find(alpha < 1f ? "Crunchee/CandyTransparent" : "Crunchee/Candy");
             var m = new Material(sh) { name = name, color = new Color(c.r, c.g, c.b, alpha) };
             m.SetFloat("_Glossiness", smoothness);
+            // Low default rim: the candy shader adds rim into BOTH emission and
+            // alpha, so a high default hazed every surface white. Materials
+            // that want more set it explicitly.
+            m.SetFloat("_RimStrength", 0.12f);
             if (alpha < 1f) m.renderQueue = 3000;
             return m;
         }

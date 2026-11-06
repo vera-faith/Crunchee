@@ -46,12 +46,12 @@ namespace Crunchee.EditorTools
             // winging out, eyes bigger, the body rounder, limbs stubbier.
             var pudding = Mat("Pudding", new Color(1f, 0.9f, 0.7f), 1f, 0.95f);
             pudding.EnableKeyword("_EMISSION");
-            pudding.SetColor("_EmissionColor", new Color(0.2f, 0.14f, 0.07f)); // soft jelly glow so the face never goes grey
-            pudding.SetFloat("_RimStrength", 0.28f);
+            pudding.SetColor("_EmissionColor", new Color(0.06f, 0.04f, 0.02f)); // faint jelly glow so the face never goes grey
+            pudding.SetFloat("_RimStrength", 0.15f);
             pudding.SetColor("_RimColor", new Color(1f, 0.9f, 0.75f));
             var caramel = Mat("Caramel", new Color(0.76f, 0.44f, 0.14f), 1f, 1f);
             caramel.SetFloat("_SpecStrength", 1.8f);
-            caramel.SetFloat("_RimStrength", 0.2f);
+            caramel.SetFloat("_RimStrength", 0.15f);
             caramel.SetColor("_RimColor", new Color(1f, 0.7f, 0.4f));
             var caramelLight = Mat("CaramelLight", new Color(0.93f, 0.66f, 0.32f), 1f, 1f);
             caramelLight.SetFloat("_SpecStrength", 1.6f);
