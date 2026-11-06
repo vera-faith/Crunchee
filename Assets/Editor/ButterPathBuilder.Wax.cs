@@ -85,6 +85,7 @@ namespace Crunchee.EditorTools
             shell.transform.localPosition = new Vector3(0f, patTop / ButterH, 0f);
             float shellW = ButterW * 1.01f, shellD = depth * 1.01f;
             GameObject seamlessSheet = null;
+            Material crackedShellMat = null;
             if (crackable)
             {
                 // Coat footprint: rounded rect standing coatT outside the
@@ -95,12 +96,19 @@ namespace Crunchee.EditorTools
                 int nz = coating == Coating.Wax ? 3 : 2;
                 var cells = VoronoiCells(hx * 2f, hz * 2f, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, 0f);
                 ClipToRoundedRect(cells, hx, hz, cornerR);
+                // Plates only appear post-crack now, so they can have a REAL
+                // bevel again - the bevelled top edges catch the sun glint and
+                // read as broken glass. (The old invisible bevel was only a
+                // problem when the plates showed pre-crack.)
+                float plateBevel = Mathf.Min(0.04f, coatT * 0.5f + 0.004f);
+                crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", (waxLayers - 1) / 9f);
+                crackedShellMat.SetFloat("_Frost", 0.55f); // stress-whitened, contrasts the butter in the gaps
                 var meshes = new List<Mesh>();
                 for (int ci = 0; ci < cells.Count; ci++)
                 {
                     var cell = cells[ci];
                     var c = Vector2.zero; foreach (var v in cell) c += v; c /= cell.Count;
-                    var m = PrismMesh(cell, c, coatT, Mathf.Min(0.008f, coatT * 0.15f));
+                    var m = PrismMesh(cell, c, coatT, plateBevel);
                     m.name = $"{name}_Shard{ci:00}";
                     meshes.Add(m);
                     var piece = new GameObject("ShellPiece");
@@ -177,6 +185,7 @@ namespace Crunchee.EditorTools
             sq.baseMaterial = BaseMaterial.Butter; sq.coating = coating; sq.waxLayers = waxLayers;
             sq.coatingShell = shell;
             sq.seamlessShell = seamlessSheet;
+            sq.crackedShellMaterial = crackedShellMat;
             sq.dentDecal = dentRend;
 
             var ps = new GameObject("StepParticles").AddComponent<ParticleSystem>();
