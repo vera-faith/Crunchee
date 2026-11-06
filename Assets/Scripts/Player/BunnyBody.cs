@@ -114,8 +114,10 @@ namespace Crunchee.Player
             float legTargetR = grounded ? -legSwing : 12f;
 
             // --- Apply ---
-            if (earL != null) earL.localRotation = Quaternion.Euler(earPitch, 0f, -14f + earRoll);
-            if (earR != null) earR.localRotation = Quaternion.Euler(earPitch, 0f, 14f - earRoll);
+            // v12: the 55-60 deg lop droop is baked into the ear meshes now,
+            // so the pivot roll is just a small outward splay to flop around.
+            if (earL != null) earL.localRotation = Quaternion.Euler(earPitch, 0f, -8f + earRoll);
+            if (earR != null) earR.localRotation = Quaternion.Euler(earPitch, 0f, 8f - earRoll);
             if (armL != null) armL.localRotation = Quaternion.Euler(-armSwing - armRaise * 22f, 0f, -10f - armRaise * 150f);
             if (armR != null) armR.localRotation = Quaternion.Euler(armSwing - armRaise * 22f, 0f, 10f + armRaise * 150f);
             if (legL != null) legL.localRotation = Quaternion.Euler(legTargetL, 0f, 0f);
