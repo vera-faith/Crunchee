@@ -176,7 +176,11 @@ namespace Crunchee.EditorTools
             cam.allowMSAA = true;
             cam.farClipPlane = 260f;
             cam.fieldOfView = 58f;
-            camGo.AddComponent<CruncheePostFX>().shader = Shader.Find("Hidden/Crunchee/PostFX");
+            var pfx = camGo.AddComponent<CruncheePostFX>();
+            pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
+            // Golden-hour grade: mostly-neutral, low bloom, gentle vignette.
+            pfx.exposure = 0.9f; pfx.threshold = 1.2f; pfx.bloomIntensity = 0.15f;
+            pfx.saturation = 1.08f; pfx.contrast = 1.1f; pfx.vignette = 0.3f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
