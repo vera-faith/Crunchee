@@ -11,6 +11,7 @@ half _RimPower;
 half _RimStrength;
 fixed4 _EmissionColor;
 half _SpecStrength;
+half _EnvStrength;    // scales the skybox/probe sheen - butter wants gloss, not cloud mirror
 half _DentAmount;
 float4 _CruncheeDent;      // xyz = where she stands (feet), w = dent radius
 float _CruncheeDentDepth;  // how deep the squishy is pressed in right now
@@ -56,7 +57,7 @@ inline half4 LightingCandy(SurfaceOutput s, half3 viewDir, UnityGI gi)
     c.rgb = s.Albedo * gi.light.color * diff;
     c.rgb += gi.light.color * spec;
     c.rgb += s.Albedo * gi.indirect.diffuse;
-    c.rgb += gi.indirect.specular * s.Gloss * (0.12 + 0.6 * fres);
+    c.rgb += gi.indirect.specular * s.Gloss * (0.12 + 0.6 * fres) * _EnvStrength;
     c.a = s.Alpha;
     return c;
 }

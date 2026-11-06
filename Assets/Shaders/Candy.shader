@@ -6,6 +6,7 @@ Shader "Crunchee/Candy"
         _MainTex ("Albedo", 2D) = "white" {}
         _Glossiness ("Gloss", Range(0,1)) = 0.6
         _SpecStrength ("Highlight", Range(0,3)) = 1.2
+        _EnvStrength ("Sky Sheen", Range(0,1)) = 1
         _Wrap ("Soft Wrap", Range(0,1)) = 0.45
         _RimColor ("Rim Color", Color) = (1,0.92,0.95,1)
         _RimPower ("Rim Power", Range(0.5,8)) = 3

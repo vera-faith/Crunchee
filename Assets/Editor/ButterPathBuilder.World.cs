@@ -201,6 +201,10 @@ namespace Crunchee.EditorTools
             g.position = pos;
             g.localScale = Vector3.one * scale;
             g.rotation = Quaternion.Euler(Random.Range(-15f, 15f), Random.Range(0f, 360f), Random.Range(-15f, 15f));
+            // Airborne decor casts NO shadows - floating candy + clouds used to
+            // dapple the butter tops with giant soft blobs (Faith, Nov 6).
+            foreach (var r in g.GetComponentsInChildren<MeshRenderer>())
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             var eye = PropMat("CandyEye", new Color(0.12f, 0.08f, 0.1f), 0.9f, 0f);
             var blush = PropMat("CandyBlush", new Color(1f, 0.55f, 0.65f), 0.2f, 0f);
             switch (kind)
