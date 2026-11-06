@@ -737,6 +737,9 @@ namespace Crunchee.EditorTools
             AssetDatabase.ImportAsset(path);
             var imp = (TextureImporter)AssetImporter.GetAtPath(path);
             imp.wrapMode = TextureWrapMode.Repeat;
+            imp.mipmapEnabled = true;
+            imp.filterMode = FilterMode.Trilinear;
+            imp.anisoLevel = 4;
             imp.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
