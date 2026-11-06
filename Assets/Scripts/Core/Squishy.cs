@@ -68,6 +68,15 @@ namespace Crunchee.Core
                 dentBaseScale = dentDecal.transform.localScale;
                 dentDecal.enabled = false;
             }
+            InitShellPieces();
+        }
+
+        /// <summary>Snapshot the shell's crackable plates and their home poses.
+        /// Called from Awake in play mode; PreviewCrack also calls it lazily
+        /// because Awake never runs in edit mode.</summary>
+        void InitShellPieces()
+        {
+            if (shellPieces != null) return;
             if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish || coating == Coating.Sugar))
             {
                 int n = coatingShell.transform.childCount;
@@ -84,6 +93,23 @@ namespace Crunchee.Core
                         pieceTargetPos[i] = t.localPosition; pieceTargetRot[i] = t.localRotation;
                     }
                 }
+            }
+        }
+
+        /// <summary>Edit-mode crack preview (CaptureTool review shots): runs the
+        /// same CrackShell target math, then snaps the plates straight to their
+        /// target pose - no animation, shards, particles, audio or haptics.</summary>
+        public void PreviewCrack(Vector3 worldPos)
+        {
+            InitShellPieces();
+            CrackShell(worldPos);
+            cracked = true;
+            crackAnim = 1f;
+            if (shellPieces == null) return;
+            for (int i = 0; i < shellPieces.Length; i++)
+            {
+                shellPieces[i].localPosition = pieceTargetPos[i];
+                shellPieces[i].localRotation = pieceTargetRot[i];
             }
         }
 
@@ -280,6 +306,7 @@ namespace Crunchee.Core
 
         void SpawnShards()
         {
+            if (!Application.isPlaying) return; // edit-mode crack previews show plates only
             if (shardMat == null)
             {
                 shardMat = shardMaterial != null ? shardMaterial
