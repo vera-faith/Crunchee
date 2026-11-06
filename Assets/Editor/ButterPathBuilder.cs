@@ -79,14 +79,19 @@ namespace Crunchee.EditorTools
             // --- Render quality (big build): MSAA, crisp shadows, full aniso ---
             QualitySettings.antiAliasing = 4;
             QualitySettings.shadowDistance = 70f;
+            QualitySettings.shadowCascades = 4;
             QualitySettings.shadowResolution = ShadowResolution.High;
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
 
-            // --- Lighting: warm golden bakery sun, gentler than the big build ---
+            // --- Lighting: warm golden-hour bakery sun coming from the FAR
+            // end of the climb, high and slightly to the side - its specular
+            // glints rake across the glossy butter tops toward the camera
+            // like window light. Elevation 55 keeps a step's shadow to ~0.4 m
+            // on the step below (the climb rises 0.55 per 2.3 m). ---
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.0f;
-            sun.color = new Color(1f, 0.84f, 0.7f);
-            sun.transform.rotation = Quaternion.Euler(58f, 10f, 0f); // from behind the camera: steps no longer shade each other
+            sun.type = LightType.Directional; sun.intensity = 1.15f;
+            sun.color = new Color(1f, 0.88f, 0.72f);
+            sun.transform.rotation = Quaternion.Euler(55f, 200f, 0f);
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
             sun.shadowBias = 0.05f;

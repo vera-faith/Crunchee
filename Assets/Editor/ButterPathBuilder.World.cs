@@ -41,28 +41,31 @@ namespace Crunchee.EditorTools
                 AssetDatabase.CreateAsset(sky, path);
             }
             sky.SetVector("_SunDir", new Vector4(0.55f, 0.1f, 1f, 0f));
-            // Nov 6 (Faith: "the sunset is too bright... dont make it distract
-            // from the path"): a dusky, low-contrast sunset that sits back.
-            sky.SetColor("_TopColor", new Color(0.33f, 0.27f, 0.5f));
-            sky.SetColor("_MidColor", new Color(0.7f, 0.45f, 0.58f));
-            sky.SetColor("_HorizonColor", new Color(0.8f, 0.56f, 0.5f));
-            sky.SetColor("_BottomColor", new Color(0.66f, 0.47f, 0.55f));
-            sky.SetColor("_SunColor", new Color(0.55f, 0.4f, 0.32f));
-            sky.SetColor("_CloudColor", new Color(0.86f, 0.72f, 0.72f));
-            sky.SetColor("_CloudShade", new Color(0.66f, 0.46f, 0.56f));
+            // Golden-hour bakery sky (visual overhaul): warm peach-gold sunset,
+            // still muted and low-contrast so it sits behind the path.
+            sky.SetColor("_TopColor", new Color(0.45f, 0.36f, 0.5f));
+            sky.SetColor("_MidColor", new Color(0.8f, 0.55f, 0.5f));
+            sky.SetColor("_HorizonColor", new Color(0.95f, 0.68f, 0.45f));
+            sky.SetColor("_BottomColor", new Color(0.68f, 0.5f, 0.45f));
+            sky.SetColor("_SunColor", new Color(0.8f, 0.58f, 0.36f));
+            sky.SetColor("_CloudColor", new Color(0.93f, 0.78f, 0.66f));
+            sky.SetColor("_CloudShade", new Color(0.7f, 0.5f, 0.52f));
             sky.SetFloat("_CloudCover", 0.42f);
             EditorUtility.SetDirty(sky);
             RenderSettings.skybox = sky;
 
+            // Warm neutral trilight (was dusky purple - it greyed the butter).
+            // Kept modest: sun + fill + ambient all stacking on pale surfaces
+            // is what clipped the whole frame white.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.44f, 0.4f, 0.56f);
-            RenderSettings.ambientEquatorColor = new Color(0.56f, 0.44f, 0.46f);
-            RenderSettings.ambientGroundColor = new Color(0.38f, 0.3f, 0.35f);
+            RenderSettings.ambientSkyColor = new Color(0.46f, 0.41f, 0.37f);
+            RenderSettings.ambientEquatorColor = new Color(0.45f, 0.37f, 0.33f);
+            RenderSettings.ambientGroundColor = new Color(0.31f, 0.25f, 0.24f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.86f, 0.68f, 0.74f);
-            RenderSettings.fogStartDistance = 22f;
-            RenderSettings.fogEndDistance = 110f;
+            RenderSettings.fogColor = new Color(0.96f, 0.86f, 0.76f);
+            RenderSettings.fogStartDistance = 30f;
+            RenderSettings.fogEndDistance = 140f;
 
             // Sky-only realtime probe so glossy candy picks up the sunset.
             var probeGo = new GameObject("SkyReflection");
@@ -80,12 +83,14 @@ namespace Crunchee.EditorTools
 
         static void AddFillLight()
         {
+            // Warm fill from behind the camera, no shadows: lifts the faces
+            // the golden-hour sun doesn't reach without flattening them.
             var fill = new GameObject("SkyFill").AddComponent<Light>();
             fill.type = LightType.Directional;
-            fill.color = new Color(0.86f, 0.7f, 1f);
+            fill.color = new Color(1f, 0.9f, 0.78f);
             fill.intensity = 0.22f;
             fill.shadows = LightShadows.None;
-            fill.transform.rotation = Quaternion.Euler(25f, 150f, 0f);
+            fill.transform.rotation = Quaternion.Euler(35f, 10f, 0f);
         }
 
         // ---------------------------------------------------------------- tower
