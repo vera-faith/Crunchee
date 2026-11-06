@@ -26,12 +26,20 @@ namespace Crunchee.EditorTools
         {
             poll = 0;
             EditorApplication.update += Tick;
+            Debug.Log("[Capture] watcher v2 ready");
         }
 
         static void Tick()
         {
             if (++poll % 45 != 0) return; // ~once a second, cheap
             if (!File.Exists(FlagPath)) return;
+            // Never clobber her Play session: wait until she exits Play mode.
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            AssetDatabase.Refresh();
+            // The refresh may kick off a compile/import; a domain reload re-runs
+            // WatchFlag and the next tick retries - keep the flag until then so
+            // stale code never builds.
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             File.Delete(FlagPath);
             try { BuildAndCapture(); }
             catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
@@ -87,6 +95,24 @@ namespace Crunchee.EditorTools
             Shot(cam, "99_overview", ov, Quaternion.LookRotation(b.center + Vector3.up * 2f - ov));
             var fx = cam.GetComponent<Crunchee.CameraRig.CruncheePostFX>();
             if (fx != null) { fx.enabled = false; Shot(cam, "97_nopost", cam.transform.position, cam.transform.rotation); fx.enabled = true; }
+
+            // Cracked-state previews: split the wax on butters 1, 4 and 10 at
+            // their top centre, then retake the same gameplay-angle shot.
+            // Edit mode only - the scene is never saved, so reopening resets it.
+            foreach (var i in new[] { 0, 3, 9 })
+            {
+                if (i < 0 || i >= steps.Count) continue;
+                var s = steps[i];
+                var sq = s.GetComponentInChildren<Crunchee.Core.Squishy>();
+                if (sq == null) continue;
+                var top = TopOf(s);
+                sq.PreviewCrack(top);
+                player.transform.position = top;
+                player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
+                Shot(cam, $"50_cracked_step{i + 1:00}_{s.name}", top + off, vrot);
+            }
+            player.transform.SetPositionAndRotation(startPos, startRot);
+
             Debug.Log("[Capture] done: " + Path.GetFullPath("Captures"));
         }
 
