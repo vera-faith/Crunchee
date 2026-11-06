@@ -15,6 +15,28 @@ namespace Crunchee.EditorTools
     {
         const int W = 590, H = 1278;
 
+        // Headless-style trigger for the ALREADY-OPEN editor: an agent (or a
+        // terminal) drops Temp/crunchee-capture.flag and the editor rebuilds
+        // the scene + writes Captures/ on its next update tick.
+        const string FlagPath = "Temp/crunchee-capture.flag";
+        static int poll;
+
+        [InitializeOnLoadMethod]
+        static void WatchFlag()
+        {
+            poll = 0;
+            EditorApplication.update += Tick;
+        }
+
+        static void Tick()
+        {
+            if (++poll % 45 != 0) return; // ~once a second, cheap
+            if (!File.Exists(FlagPath)) return;
+            File.Delete(FlagPath);
+            try { BuildAndCapture(); }
+            catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
+        }
+
         [MenuItem("Crunchee/Capture Review Shots")]
         public static void Capture()
         {
