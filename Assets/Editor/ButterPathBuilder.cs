@@ -82,9 +82,11 @@ namespace Crunchee.EditorTools
 
             // --- Render quality (big build): MSAA, crisp shadows, full aniso ---
             QualitySettings.antiAliasing = 4;
-            QualitySettings.shadowDistance = 70f;
+            QualitySettings.shadowDistance = 30f; // the camera is close - short range = dense shadow texels
             QualitySettings.shadowCascades = 4;
-            QualitySettings.shadowResolution = ShadowResolution.High;
+            QualitySettings.shadowCascade4Split = new Vector3(0.05f, 0.18f, 0.45f); // splits weighted near the camera
+            QualitySettings.shadowProjection = ShadowProjection.StableFit;
+            QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
 
             // --- Lighting: warm golden-hour bakery sun coming from the FAR
@@ -98,8 +100,8 @@ namespace Crunchee.EditorTools
             sun.transform.rotation = Quaternion.Euler(55f, 200f, 0f);
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
-            sun.shadowBias = 0.05f;
-            sun.shadowNormalBias = 0.4f; // was 0.04: far too tight, acned the flat tops into camo blotches
+            sun.shadowBias = 0.03f;
+            sun.shadowNormalBias = 0.5f; // curved surfaces (bunny, SDF) need the offset to not self-shadow-band; still tight enough to avoid peter-panning
             AddFillLight();
 
             // --- The candy hall (Nov 6): one straight climb up +Z ---
