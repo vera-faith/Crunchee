@@ -5,6 +5,7 @@ Shader "Crunchee/Wax"
         _Color ("Milky Tint", Color) = (1,0.99,0.97,1)
         _MainTex ("Albedo", 2D) = "white" {}
         _Thickness ("Wax Build", Range(0,1)) = 0
+        _Frost ("Stress Frost", Range(0,1)) = 0
         _Glossiness ("Gloss", Range(0,1)) = 0.92
         _SpecStrength ("Sun Specular", Range(0,4)) = 2.2
         _EnvStrength ("Sky Reflection", Range(0,1)) = 0.45
@@ -26,6 +27,7 @@ Shader "Crunchee/Wax"
         #include "CandyLighting.cginc"
 
         half _Thickness;
+        half _Frost;
 
         // Soft wrapped diffuse for the milky veil, a STRONG tight sun
         // specular, and a fresnel-weighted sky reflection - a clear glossy
@@ -63,13 +65,14 @@ Shader "Crunchee/Wax"
             o.Gloss = _Glossiness;
             o.Specular = _Glossiness;
             // The milky veil grows with the coat build; the butter always
-            // reads through it.
-            o.Albedo = c.rgb * lerp(0.55f, 1.0f, _Thickness);
-            // Base alpha from the coat build (0.05 -> 0.38); the fresnel edge
-            // boost is CAPPED so grazing angles turn glassy, never opaque
-            // white, and there is NO rim emission (that was the haze).
+            // reads through it. _Frost stress-whitens cracked plates so they
+            // contrast with the clean yellow butter showing in the gaps.
+            o.Albedo = lerp(c.rgb * lerp(0.55f, 1.0f, _Thickness), half3(1, 1, 1), _Frost * 0.35f);
+            // Base alpha from the coat build (0.05 -> 0.38) + _Frost; the
+            // fresnel edge boost is CAPPED so grazing angles turn glassy,
+            // never opaque white, and there is NO rim emission (the haze).
             half rim = pow(1.0 - saturate(dot(normalize(IN.viewDir), o.Normal)), 3.0);
-            half base = lerp(0.05f, 0.38f, _Thickness);
+            half base = lerp(0.05f, 0.38f, _Thickness) + _Frost * 0.3f;
             o.Alpha = saturate((base + min(rim, 0.25f)) * c.a);
         }
         ENDCG
