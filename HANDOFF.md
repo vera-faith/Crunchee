@@ -22,27 +22,32 @@ Read this first if you're picking up this project cold. Everything below is veri
 - All sounds and music are original procedural synth in `Assets/Scripts/Audio/AsmrSynth.cs` — never ripped audio. The background music is an original 16-second music-box loop composed in code.
 
 ## Key scripts
-- `Assets/Scripts/Core/Squishy.cs` — crack/sink/spring behaviour, plate-gap crack texture drawing, step cracks.
+- `Assets/Scripts/Core/Squishy.cs` — crack/sink/spring behaviour. The drawn crack-network texture is GONE (Nov 6: Faith doesn't want crack-web marks on the butters). The crack visual is the physical plate split: a smooth `seamlessShell` sheet shows until first landing, then swaps for the hidden Voronoi plates which slide apart widest where she hit (`CrackShell(impact)`).
 - `Assets/Scripts/Player/PlayerController.cs` — walk glue to squishy tops, jump, eased input (moveSpeed 3.6, turnSpeed 12 since Nov 6 so she can spin freely, inputSmooth 4.5 — tuned after "too sensitive" feedback; don't retune casually), fall safety net (y < -5 respawns).
-- `Assets/Scripts/Player/BunnyBody.cs` — bunny animation springs: ears flop back on jump / overshoot forward on landing, arms raise in the air, legs swing when walking, body bob/sway, idle breathing.
+- `Assets/Scripts/Player/BunnyBody.cs` — bunny animation springs: ears flop back on jump / overshoot forward on landing, arms raise in the air, legs swing when walking, body bob/sway, idle breathing. Ear base roll 14° (v11 droopy ears).
 - `Assets/Scripts/Camera/ThirdPersonFollow.cs` — FIXED high view looking up the climb (Nov 6, owner: "the character can face any direction, but the surrounding and top view stays the same"). Follows position only, never her facing.
 - Squish dent: `Crunchee/Candy` shaders bend vertices under her feet when the material has `_DentAmount` = 1 (globals `_CruncheeDent`/`_CruncheeDentDepth` set by `PlayerController.UpdateDent`). Wax shells are Voronoi plate meshes (`VoronoiCells`/`PrismMesh`).
 - `Assets/Scripts/Game/FinishTrigger.cs` — its own file on purpose: a MonoBehaviour class must live in a file of the same name or Unity won't load it.
 - `Assets/Scripts/UI/ProgressHud.cs` — the 10 gold pips; counts `Squishy.Cracked`.
 
 ## Locked design decisions (owner's calls — don't relitigate)
-- The bunny must match the owner's reference image exactly: glossy translucent jelly pudding, HUGE round head, caramel helmet cap with forehead drips, very long wide lop ears with caramel over the top halves and NO pink inner ear, big glossy eyes, tiny pink nose, OPEN smile with tongue, caramel collar with drips, tiny arms/legs, cream tail. Current build is v10 (Nov 6, owner's caramel-glazed chibi reference image): golden-cream head, amber caramel crown with drips all round, glazed lop ears, caramel body with cream belly.
+- The bunny must match the owner's reference image exactly: glossy translucent jelly pudding, HUGE round head, caramel helmet cap with forehead drips, very long wide lop ears with caramel over the top halves and NO pink inner ear, big glossy eyes, tiny pink nose, OPEN smile with tongue, caramel collar with drips, tiny arms/legs, cream tail. Current build is v11 (Nov 6, "cuter and chubbier"): bigger rounder head with melted-in cheeks, caramel cap hugging the crown (no pancake brim), short round crown drips, lop ears that DROOP down the sides, bigger eyes, rounder body, stubbier limbs.
+- Butter tops stay CLEAN: no drawn crack marks ever (removed the whole crack-decal texture + node system Nov 6). The wax shell is a seamless glaze sheet until the landing physically splits it into plates.
 - Characters are made of food/squishy material, glossy — never fur/plush. Roster of 4: Pudding Bunny (player), Tofu Cub, Peach Jelly Duck, Matcha Mochi Bear (other 3 not built yet).
 - Sound model: soft squish is the base; the wax CRACK is the star (louder than the squish). Landing = deep squish, then the crack a beat later (~0.07s).
 - 10 progress pips stay. There is deliberately NO finish celebration.
 - Future features the owner wants: a giant pressable ASMR keyboard, character select, sugar/honey/nail-polish coating stretches (synth recipes + data already in code, currently unused in the path).
 
 ## Known issues from the build 2 playtest (Nov 5, 2026)
-1. **Magenta square artifact** on/near the butter surface in phone screenshots — classic failed-texture color. Suspects: the TwinkleDust sparkle particle sprite or a crack decal rendering differently on device than in the editor.
-2. The flat golden crack-network patch still reads as *tangled golden straw* up close instead of clean polygonal plates with wide, deep, glossy gaps (reference: large uneven plates, never uniform — real cracked wax/glass is never the same size twice).
-3. After cracking, the butter top can read glassy/messy (large overlapping translucent shards).
+1. **Magenta square artifact** on/near the butter surface in phone screenshots — classic failed-texture color. Suspects: the TwinkleDust sparkle particle sprite. (The crack decal is gone, so it's not that.)
+2. ~~Golden crack-network reads as tangled straw~~ RESOLVED Nov 6: drawn cracks removed entirely; butter tops are clean glaze sheets.
+3. ~~Butter top reads glassy/messy after cracking~~ partially addressed: translucent plates only appear on crack now; watch device shots.
 4. Open question: all 10 pips showed gold in screenshots taken near spawn — either the owner finished the path first (plausible) or pips light early. Unconfirmed either way.
-5. Not yet reported by the owner: feel of the ear flop/arms/legs in motion, movement smoothness, spiral spacing, music and overall sound mix.
+5. Not yet reported by the owner: feel of the ear flop/arms/legs in motion, movement smoothness, music and overall sound mix.
+6. NEW Nov 6: owner wants NO crack-web marks on butters (done) + a cuter chubbier bunny (v11 done). Verify the seamless-sheet swap looks right on device; the plate split moment is the only crack visual now.
+
+## Running headless captures
+- `Unity -batchmode -projectPath <repo> -executeMethod Crunchee.EditorTools.CaptureTool.BuildAndCapture -quit -logFile Logs/batch.log` — rebuilds the scene and writes `Captures/*.png`. ~2-3 min. If the editor is open, drop `Temp/crunchee-capture.flag` instead: `CaptureTool.Tick` polls for it every ~1s and runs the same thing.
 
 ## Git rules for this repo
 - GitHub `vera-faith/Crunchee` (private), branch `main`. The Mac clone at `~/Developer/Crunchee` is the working copy; scene/texture binaries travel via GitHub Desktop commits from the Mac (the API connector rejects binaries).
