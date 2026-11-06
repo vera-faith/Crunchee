@@ -49,6 +49,8 @@ namespace Crunchee.Core
         public int stage = 1;
         [Tooltip("Shared material for flying wax chips (assigned by the builder so it ships in the build).")]
         public Material shardMaterial;
+        [Tooltip("Frosted/stress-whitened wax variant the plates switch to on crack.")]
+        public Material crackedShellMaterial;
         Material dentMat; Vector3 dentBaseScale; float dentShown;
         Vector3 trackPos; float trackTime = -10f;
 
@@ -264,11 +266,17 @@ namespace Crunchee.Core
             if (coatingShell == null) return;
             if (shellPieces != null && shellPieces.Length > 0)
             {
-                // Swap the smooth sheet for the real plates at the split.
+                // Swap the smooth sheet for the real plates at the split,
+                // stress-whitened so they read as broken glassy wax.
                 if (seamlessShell != null)
                 {
                     seamlessShell.SetActive(false);
-                    for (int i = 0; i < shellPieces.Length; i++) shellPieces[i].gameObject.SetActive(true);
+                    for (int i = 0; i < shellPieces.Length; i++)
+                    {
+                        shellPieces[i].gameObject.SetActive(true);
+                        if (crackedShellMaterial != null)
+                            shellPieces[i].GetComponent<MeshRenderer>().sharedMaterial = crackedShellMaterial;
+                    }
                 }
                 var ls = coatingShell.transform.lossyScale;
                 Vector3 imp = coatingShell.transform.InverseTransformPoint(impact);
