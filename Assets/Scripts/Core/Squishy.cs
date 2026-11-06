@@ -286,9 +286,12 @@ namespace Crunchee.Core
                     dir.Normalize();
                     float d = Vector2.Distance(new Vector2(hx, hz), new Vector2(ix, iz));
                     float near = Mathf.Clamp01(1.5f - d / 1.7f);       // 1 at impact, ~0 past ~2.5 units
-                    float sep = Mathf.Lerp(0.04f, 0.15f, near);        // world units of plate separation
-                    float drop = Mathf.Lerp(0.02f, 0.05f, near);
-                    float tilt = Mathf.Lerp(4f, 12f, near);
+                    // ~0.03 m gap minimum everywhere, blooming wider/deeper/
+                    // harder-tilted near the landing - and chunkier the
+                    // thicker the wax layer is.
+                    float sep = Mathf.Lerp(0.03f, 0.14f + waxLayers * 0.006f, near);
+                    float drop = Mathf.Lerp(0.02f, 0.05f + waxLayers * 0.005f, near);
+                    float tilt = Mathf.Lerp(4f, 12f + waxLayers, near);
                     pieceTargetPos[i] = home + new Vector3(dir.x * sep / Mathf.Max(0.01f, Mathf.Abs(ls.x)),
                                                             -drop / Mathf.Max(0.01f, Mathf.Abs(ls.y)),
                                                             dir.z * sep / Mathf.Max(0.01f, Mathf.Abs(ls.z)));
