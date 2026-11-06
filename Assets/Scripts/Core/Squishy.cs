@@ -53,6 +53,7 @@ namespace Crunchee.Core
         // Contrast pass (build-1 playtest, Nov 3): on the phone the gold core
         // dominated and the plates read as tangled straw. Darker + wider
         // shadow, thinner + deeper gold core, so plates read as plates.
+        const int MaxCrackNodes = 180;
         static readonly Color GapShadow = new Color(0.36f, 0.19f, 0.06f, 0.78f);
         static readonly Color GapButter = new Color(0.97f, 0.75f, 0.29f, 0.95f);
         static readonly Color GapEdge = new Color(1f, 1f, 1f, 0.85f);
@@ -310,20 +311,21 @@ namespace Crunchee.Core
             var nrm = new Vector2(-(b.y - a.y), b.x - a.x) / len;
             var pts = new Vector2[4];
             pts[0] = a; pts[3] = b;
-            pts[1] = Vector2.Lerp(a, b, 0.33f) + nrm * Random.Range(-len * 0.13f, len * 0.13f);
-            pts[2] = Vector2.Lerp(a, b, 0.66f) + nrm * Random.Range(-len * 0.13f, len * 0.13f);
-            float w = Random.Range(0.75f, 1.35f); // every gap its own width
+            pts[1] = Vector2.Lerp(a, b, 0.33f) + nrm * Random.Range(-len * 0.05f, len * 0.05f);
+            pts[2] = Vector2.Lerp(a, b, 0.66f) + nrm * Random.Range(-len * 0.05f, len * 0.05f);
+            float w = Random.Range(0.8f, 1.2f); // every gap its own width
             for (int s = 0; s < 3; s++)
             {
-                DrawGapPass(pts[s], pts[s + 1], GapShadow, 6.0f * w);
-                DrawGapPass(pts[s], pts[s + 1], GapButter, 2.2f * w);
-                var off = new Vector2(1.7f, 1.7f);
-                DrawGapPass(pts[s] + off, pts[s + 1] + off, GapEdge, 1.2f);
+                // Clean plate seams (playtest: thick jagged triple lines read as tangled straw).
+                DrawGapPass(pts[s], pts[s + 1], GapShadow, 3.2f * w);
+                DrawGapPass(pts[s], pts[s + 1], GapButter, 1.3f * w);
+                var off = new Vector2(1.4f, 1.4f);
+                DrawGapPass(pts[s] + off, pts[s + 1] + off, GapEdge, 0.8f);
             }
             // A long border sometimes sprouts one short T-stub - real plates
             // micro-crack off their edges. It grows FROM the border, so it
             // never reads as a random mark.
-            if (len > 70f && Random.value < 0.30f)
+            if (len > 90f && Random.value < 0.15f)
             {
                 var mid = pts[1];
                 float side = Random.value < 0.5f ? -1f : 1f;
@@ -380,7 +382,7 @@ namespace Crunchee.Core
             // nodes at wildly varied distances, some skip-one chords, and a
             // random few long spokes - like real shattered wax/glass, no two
             // plates the same size or shape.
-            int R1 = Random.Range(8, 12);
+            int R1 = Random.Range(6, 9);
             var ring = new int[R1];
             float baseAng = Random.Range(0f, Mathf.PI * 2f);
             for (int i = 0; i < R1; i++)
@@ -417,8 +419,8 @@ namespace Crunchee.Core
             if (crackTex == null || crackDecal == null) return;
             var p = WorldToCrackPx(worldPos);
             if (!InCrackRange(p)) { hasTrail = false; return; }
-            if (hasTrail && Vector2.Distance(p, trailPx) < Random.Range(8f, 16f)) { trailPx = p; return; } // tiny shuffle: no new plate
-            if (crackNodes.Count > 460) { trailPx = p; hasTrail = true; return; }
+            if (hasTrail && Vector2.Distance(p, trailPx) < Random.Range(20f, 30f)) { trailPx = p; return; } // tiny shuffle: no new plate
+            if (crackNodes.Count > MaxCrackNodes) { trailPx = p; hasTrail = true; return; }
             int ni = AddNode(p);
             int n1 = -1, n2 = -1; float d1 = 115f, d2 = 115f;
             for (int i = 0; i < crackNodes.Count - 1; i++)
@@ -444,13 +446,16 @@ namespace Crunchee.Core
         public void AddStepCrack(Vector3 worldPos)
         {
             if (crackTex == null || crackDecal == null) return;
-            if (crackNodes.Count > 460) return;
+            if (crackNodes.Count > MaxCrackNodes) return;
             var c = WorldToCrackPx(worldPos);
             if (!InCrackRange(c)) return;
             float pxPerUnit = Vector2.Distance(c, WorldToCrackPx(worldPos + Vector3.right));
-            float rad = Random.Range(0.22f, 0.5f) * pxPerUnit; // every step shatters a different-sized cluster
+            // Already broken up here: keep plates readable instead of piling on more seams.
+            for (int i = 0; i < crackNodes.Count; i++)
+                if (Vector2.Distance(c, crackNodes[i]) < 0.28f * pxPerUnit) return;
+            float rad = Random.Range(0.35f, 0.6f) * pxPerUnit; // every step shatters a different-sized cluster
             int ci = AddNode(c);
-            int N = Random.Range(4, 8);
+            int N = Random.Range(3, 6);
             var ring = new int[N];
             float baseAng = Random.Range(0f, Mathf.PI * 2f);
             for (int i = 0; i < N; i++)

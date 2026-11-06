@@ -104,9 +104,9 @@ namespace Crunchee.EditorTools
             // Glass tower + glowing pillars + sunset sky + floating candy (reference videos).
             BuildSunsetTower(center);
 
-            var butterMat = Mat("Butter", new Color(1f, 0.88f, 0.6f), 1f, 0.75f);
+            var butterMat = Mat("Butter", new Color(0.98f, 0.86f, 0.66f), 1f, 0.75f);
             butterMat.mainTexture = ButterSwirlTexture();
-            var patMat = Mat("ButterPat", new Color(1f, 0.9f, 0.64f), 1f, 0.8f);
+            var patMat = Mat("ButterPat", new Color(0.99f, 0.88f, 0.68f), 1f, 0.8f);
             patMat.mainTexture = ButterSwirlTexture();
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
@@ -299,6 +299,9 @@ namespace Crunchee.EditorTools
                 var decalMat = Mat("CrackDecal", Color.white, 0.99f, 0.5f);
                 decalMat.renderQueue = 3002;
                 NoSheen(decalMat);
+                // Starts clear: Squishy draws cracks into a runtime texture; without
+                // this the decal shows as a solid white slab until Awake.
+                decalMat.mainTexture = LoadOrCreateTexture("Assets/Textures/Clear.png", 4, 4, (x, y, w, h) => Color.clear);
                 var decal = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 decal.name = "CrackDecal";
                 decal.transform.SetParent(step.transform, false);
