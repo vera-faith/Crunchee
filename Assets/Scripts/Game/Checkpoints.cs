@@ -10,18 +10,29 @@ namespace Crunchee.Game
     {
         public static Checkpoint Current;
         public float killHeight = -6f;
+        [Tooltip("Active from the start (spawn point). Otherwise it arms when the player first touches it.")]
+        public bool startActive;
+        [Tooltip("Sparkle burst played the first time the player reaches this checkpoint.")]
+        public ParticleSystem burst;
         Transform player;
+        bool reached;
 
-        void Start() { if (Current == null) Current = this; player = GameObject.FindGameObjectWithTag("Player")?.transform; }
+        void Start()
+        {
+            if (startActive && Current == null) Current = this;
+            player = GameObject.FindGameObjectWithTag("Player")?.transform;
+        }
 
         void OnTriggerEnter(Collider other)
         {
-            if (other.CompareTag("Player")) Current = this;
+            if (!other.CompareTag("Player")) return;
+            Current = this;
+            if (!reached) { reached = true; if (burst != null) burst.Play(); }
         }
 
         void Update()
         {
-            if (player != null && Current != null && player.position.y < Current.transform.position.y + killHeight)
+            if (Current == this && player != null && player.position.y < transform.position.y + killHeight)
             {
                 var cc = player.GetComponent<CharacterController>();
                 if (cc) cc.enabled = false;

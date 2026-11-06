@@ -44,6 +44,8 @@ namespace Crunchee.Core
         static Material shardMat;
         [Tooltip("Position along the course; drives the progress pips.")]
         public int pathOrder;
+        [Tooltip("Course stage (1 = Butter Path, 2 = Candy Path); the pips show one stage at a time.")]
+        public int stage = 1;
         [Tooltip("Shared material for flying wax chips (assigned by the builder so it ships in the build).")]
         public Material shardMaterial;
         Texture2D crackTex;
@@ -89,7 +91,7 @@ namespace Crunchee.Core
                 dentBaseScale = dentDecal.transform.localScale;
                 dentDecal.enabled = false;
             }
-            if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish))
+            if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish || coating == Coating.Sugar))
             {
                 int n = coatingShell.transform.childCount;
                 if (n > 0)

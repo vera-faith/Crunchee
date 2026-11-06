@@ -137,6 +137,28 @@ namespace Crunchee.EditorTools
                 lastPos = p; lastAngle = ang; idx++;
             }
 
+            // --- Stage 2 (Candy Path): a checkpoint pad in the next spiral slot,
+            // then ten candy squishies from the reference videos keep climbing.
+            // The Butter Path itself stays exactly the 10 wax butters. ---
+            {
+                float padDeg = -90f + idx * SpiralStepDeg, padAng = padDeg * Mathf.Deg2Rad;
+                BuildCheckpointPad(new Vector3(center.x + Mathf.Cos(padAng) * SpiralR,
+                                               0.35f + idx * SpiralRise,
+                                               center.z + Mathf.Sin(padAng) * SpiralR), -padDeg);
+                idx++;
+            }
+            int candyN = 0;
+            foreach (var def in CandyPath())
+            {
+                float angDeg = -90f + idx * SpiralStepDeg;
+                float ang = angDeg * Mathf.Deg2Rad;
+                var p = new Vector3(center.x + Mathf.Cos(ang) * SpiralR,
+                                    0.35f + idx * SpiralRise,
+                                    center.z + Mathf.Sin(ang) * SpiralR);
+                BuildCandyStep(p, ++candyN, def, -angDeg, SpiralDepth);
+                lastPos = p; lastAngle = ang; idx++;
+            }
+
             // --- Finish platform: one more rise past butter 10, along its tangent ---
             var tangent = new Vector3(-Mathf.Sin(lastAngle), 0f, Mathf.Cos(lastAngle));
             var finishPos = lastPos + tangent * 3.3f;
@@ -870,24 +892,24 @@ namespace Crunchee.EditorTools
             var frostingWhite = Mat("RingFrosting", new Color(1f, 0.98f, 0.95f), 1f, 0.5f);
 
             // --- Center tower: stacked cake tiers the staircase wraps ---
-            float[] tierR = { 1.3f, 1.05f, 0.8f };
-            float[] tierH = { 2.1f, 1.9f, 1.9f };
+            int tiers = Mathf.Max(3, Mathf.CeilToInt((finishPos.y - 0.2f) / 1.95f));
             float y = -0.05f;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < tiers; i++)
             {
+                float tr = Mathf.Lerp(1.3f, 0.75f, i / Mathf.Max(1f, tiers - 1f)), th = i == 0 ? 2.1f : 1.9f;
                 var tier = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 tier.name = $"TowerTier{i + 1}";
-                tier.transform.position = center + new Vector3(0f, y + tierH[i] / 2f, 0f);
-                tier.transform.localScale = new Vector3(tierR[i] * 2f, tierH[i] / 2f, tierR[i] * 2f);
+                tier.transform.position = center + new Vector3(0f, y + th / 2f, 0f);
+                tier.transform.localScale = new Vector3(tr * 2f, th / 2f, tr * 2f);
                 tier.GetComponent<MeshRenderer>().material = cakeMats[i % cakeMats.Length];
                 Object.DestroyImmediate(tier.GetComponent<Collider>());
                 var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 ring.name = "FrostingRing";
-                ring.transform.position = center + new Vector3(0f, y + tierH[i] - 0.03f, 0f);
-                ring.transform.localScale = new Vector3((tierR[i] + 0.07f) * 2f, 0.06f, (tierR[i] + 0.07f) * 2f);
+                ring.transform.position = center + new Vector3(0f, y + th - 0.03f, 0f);
+                ring.transform.localScale = new Vector3((tr + 0.07f) * 2f, 0.06f, (tr + 0.07f) * 2f);
                 ring.GetComponent<MeshRenderer>().material = frostingWhite;
                 Object.DestroyImmediate(ring.GetComponent<Collider>());
-                y += tierH[i];
+                y += th;
             }
             // Glowing star-sphere on top + one warm point light
             var star = GameObject.CreatePrimitive(PrimitiveType.Sphere);

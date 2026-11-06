@@ -27,17 +27,15 @@ namespace Crunchee.EditorTools
 
             var steps = new List<Transform>();
             foreach (var go in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
-                if (go.parent == null && go.name.StartsWith("Step_")) steps.Add(go);
-            if (steps.Count == 0)
-                foreach (var go in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
-                    if (go.parent == null && go.name.StartsWith("Butter_")) steps.Add(go);
-            steps.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+                if (go.parent == null && (go.name.StartsWith("Butter_") || go.name.StartsWith("Candy_"))) steps.Add(go);
+            int Order(Transform t) { var q = t.GetComponentInChildren<Crunchee.Core.Squishy>(); return q != null ? q.pathOrder : 0; }
+            steps.Sort((a, b) => Order(a).CompareTo(Order(b)));
 
             var startPos = player.transform.position;
             var startRot = player.transform.rotation;
             Shot(cam, "00_start", cam.transform.position, cam.transform.rotation);
 
-            int[] picks = { 2, steps.Count / 3, steps.Count / 2, (2 * steps.Count) / 3, steps.Count - 2 };
+            int[] picks = { 3, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18 };
             var done = new HashSet<int>();
             foreach (var i in picks)
             {
