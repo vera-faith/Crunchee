@@ -11,6 +11,7 @@ Shader "Crunchee/Candy"
         _RimPower ("Rim Power", Range(0.5,8)) = 3
         _RimStrength ("Rim Strength", Range(0,2)) = 0.35
         [HDR] _EmissionColor ("Emission", Color) = (0,0,0,0)
+        _DentAmount ("Squish Dent", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
     SubShader
@@ -19,7 +20,7 @@ Shader "Crunchee/Candy"
         LOD 200
         Cull [_Cull]
         CGPROGRAM
-        #pragma surface CandySurf Candy fullforwardshadows
+        #pragma surface CandySurf Candy fullforwardshadows vertex:CandyVert addshadow
         #pragma target 3.0
         #include "CandyLighting.cginc"
         ENDCG

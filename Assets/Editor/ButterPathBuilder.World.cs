@@ -41,6 +41,16 @@ namespace Crunchee.EditorTools
                 AssetDatabase.CreateAsset(sky, path);
             }
             sky.SetVector("_SunDir", new Vector4(0.55f, 0.1f, 1f, 0f));
+            // Nov 6 (Faith: "the sunset is too bright... dont make it distract
+            // from the path"): a dusky, low-contrast sunset that sits back.
+            sky.SetColor("_TopColor", new Color(0.33f, 0.27f, 0.5f));
+            sky.SetColor("_MidColor", new Color(0.7f, 0.45f, 0.58f));
+            sky.SetColor("_HorizonColor", new Color(0.8f, 0.56f, 0.5f));
+            sky.SetColor("_BottomColor", new Color(0.66f, 0.47f, 0.55f));
+            sky.SetColor("_SunColor", new Color(0.55f, 0.4f, 0.32f));
+            sky.SetColor("_CloudColor", new Color(0.86f, 0.72f, 0.72f));
+            sky.SetColor("_CloudShade", new Color(0.66f, 0.46f, 0.56f));
+            sky.SetFloat("_CloudCover", 0.42f);
             EditorUtility.SetDirty(sky);
             RenderSettings.skybox = sky;
 
@@ -50,13 +60,13 @@ namespace Crunchee.EditorTools
             RenderSettings.ambientGroundColor = new Color(0.38f, 0.3f, 0.35f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.98f, 0.76f, 0.74f);
-            RenderSettings.fogStartDistance = 34f;
-            RenderSettings.fogEndDistance = 150f;
+            RenderSettings.fogColor = new Color(0.86f, 0.68f, 0.74f);
+            RenderSettings.fogStartDistance = 22f;
+            RenderSettings.fogEndDistance = 110f;
 
             // Sky-only realtime probe so glossy candy picks up the sunset.
             var probeGo = new GameObject("SkyReflection");
-            probeGo.transform.position = new Vector3(0f, 6f, SpiralCenterZ);
+            probeGo.transform.position = new Vector3(0f, 6f, PathStartZ + 20f);
             var probe = probeGo.AddComponent<ReflectionProbe>();
             probe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
             probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.OnAwake;
@@ -80,51 +90,64 @@ namespace Crunchee.EditorTools
 
         // ---------------------------------------------------------------- tower
 
-        static void BuildSunsetTower(Vector3 center)
+        /// <summary>
+        /// The candy hall (Nov 6): the course is one straight climb, so the
+        /// world is a long pink checker hall with glowing pillars, candy
+        /// floating beside the path and a soft dusk sky past the far end.
+        /// Everything stays low-contrast so the squishies are the focus.
+        /// </summary>
+        static void BuildCandyHall(float zMin, float zMax, float topY)
         {
-            var root = new GameObject("SunsetTower").transform;
+            var root = new GameObject("CandyHall").transform;
+            float len = zMax - zMin, zc = (zMin + zMax) / 2f, wallH = topY + 9f;
 
-            // Glass wall: an open tube, drawn first among transparents so
-            // the wax and jelly always sort on top of it.
-            var glass = Mat("TowerGlass", new Color(0.96f, 0.88f, 1f), 0.06f, 0.95f);
-            glass.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            glass.SetColor("_RimColor", new Color(1f, 0.85f, 0.95f));
-            glass.SetFloat("_RimStrength", 0.3f);
-            glass.SetFloat("_SpecStrength", 0.6f);
-            glass.SetFloat("_RimPower", 3.5f);
-            glass.renderQueue = 2950;
-            var tube = new GameObject("GlassWall");
-            tube.transform.SetParent(root, false);
-            tube.transform.position = center + new Vector3(0f, -0.3f, 0f);
-            tube.AddComponent<MeshFilter>().sharedMesh = SaveMesh(TubeMesh(TowerR, TowerH, 64), "GlassTube");
-            tube.AddComponent<MeshRenderer>().sharedMaterial = glass;
-
-            // Glowing white pillars (bloom turns them into soft light bars).
-            var pillarMat = EmissiveMat("Pillar", new Color(1f, 0.97f, 0.98f), 1.6f);
-            var trimMat = EmissiveMat("PillarTrim", new Color(1f, 0.8f, 0.9f), 1.1f);
-            const int pillars = 18;
-            for (int i = 0; i < pillars; i++)
+            var wallMat = Mat("HallWall", new Color(0.96f, 0.84f, 0.9f), 1f, 0.3f);
+            wallMat.mainTexture = CheckerTexture();
+            wallMat.mainTextureScale = new Vector2(len / 3f, wallH / 3f);
+            wallMat.SetFloat("_RimStrength", 0.04f);
+            wallMat.SetFloat("_SpecStrength", 0.25f);
+            var pillarMat = EmissiveMat("Pillar", new Color(1f, 0.95f, 0.97f), 0.85f);
+            var trimMat = EmissiveMat("PillarTrim", new Color(1f, 0.8f, 0.9f), 0.6f);
+            foreach (var side in new[] { -1f, 1f })
             {
-                float a = (i + 0.5f) * Mathf.PI * 2f / pillars;
-                var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                var p = Box("Pillar", center + dir * (TowerR - 0.05f) + Vector3.up * (TowerH / 2f - 0.3f),
-                            new Vector3(0.38f, TowerH, 0.38f), pillarMat);
-                p.transform.SetParent(root, true);
-                p.transform.rotation = Quaternion.LookRotation(dir);
-                Object.DestroyImmediate(p.GetComponent<Collider>());
-            }
-            // Horizontal glowing rings at a few heights
-            foreach (float ry in new[] { 0.05f, 12f, 24f, TowerH - 0.4f })
-            {
-                var ring = new GameObject("TowerRing");
-                ring.transform.SetParent(root, false);
-                ring.transform.position = center + new Vector3(0f, ry - 0.3f, 0f);
-                ring.AddComponent<MeshFilter>().sharedMesh = SaveMesh(TubeMesh(TowerR + 0.02f, 0.22f, 64), "TowerRing");
-                ring.AddComponent<MeshRenderer>().sharedMaterial = trimMat;
+                var wall = Box("HallWall", new Vector3(side * (HallHalfW + 0.15f), wallH / 2f - 0.3f, zc), new Vector3(0.3f, wallH, len), wallMat);
+                wall.transform.SetParent(root, true);
+                for (float z = zMin + 2f; z < zMax; z += 4.5f)
+                {
+                    var p = Box("Pillar", new Vector3(side * (HallHalfW - 0.1f), wallH / 2f - 0.3f, z), new Vector3(0.32f, wallH, 0.32f), pillarMat);
+                    p.transform.SetParent(root, true);
+                    Object.DestroyImmediate(p.GetComponent<Collider>());
+                }
+                foreach (float ty in new[] { 0.1f, topY * 0.5f, topY + 2f, wallH - 0.5f })
+                {
+                    var t = Box("PillarTrim", new Vector3(side * (HallHalfW - 0.05f), ty, zc), new Vector3(0.14f, 0.14f, len), trimMat);
+                    t.transform.SetParent(root, true);
+                    Object.DestroyImmediate(t.GetComponent<Collider>());
+                }
             }
 
-            BuildFloatingCandy(center, root);
-            BuildSkyCandy(center, root);
+            // Candy floating beside the path (never over it), rising with the climb.
+            int n = Mathf.RoundToInt(len / 2.1f);
+            for (int i = 0; i < n; i++)
+            {
+                float z = Mathf.Lerp(zMin + 3f, zMax - 2f, (i + Random.Range(0.1f, 0.9f)) / n);
+                float side = i % 2 == 0 ? -1f : 1f;
+                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
+                var pos = new Vector3(side * Random.Range(4.2f, 7f), pathY + Random.Range(-2.5f, 3.5f), z);
+                var prop = CandyProp(i % 7, pos, Random.Range(0.7f, 1.2f), root);
+                var bob = prop.gameObject.AddComponent<FloatBob>();
+                bob.amplitude = Random.Range(0.15f, 0.35f); bob.speed = Random.Range(0.4f, 0.8f);
+                bob.spin = Random.Range(-14f, 14f); bob.phase = Random.Range(0f, 6.28f);
+            }
+            // A few giant candies drifting in the sky past the far end.
+            for (int i = 0; i < 10; i++)
+            {
+                var pos = new Vector3(Random.Range(-18f, 18f), wallH + Random.Range(-4f, 12f), zMax + Random.Range(6f, 34f));
+                var prop = CandyProp(i % 7, pos, Random.Range(2.2f, 4f), root);
+                var bob = prop.gameObject.AddComponent<FloatBob>();
+                bob.amplitude = Random.Range(0.4f, 0.9f); bob.speed = Random.Range(0.2f, 0.4f);
+                bob.spin = Random.Range(-6f, 6f); bob.phase = Random.Range(0f, 6.28f);
+            }
         }
 
         static Material CheckerFloorMat()
@@ -267,38 +290,6 @@ namespace Crunchee.EditorTools
             return g;
         }
 
-        static void BuildFloatingCandy(Vector3 center, Transform root)
-        {
-            // Inside the tower, between the staircase (r < 7.4) and the glass.
-            int n = 26;
-            for (int i = 0; i < n; i++)
-            {
-                float a = (i / (float)n) * Mathf.PI * 2f + Random.Range(-0.1f, 0.1f);
-                float r = Random.Range(8.6f, 12.4f);
-                float y = Random.Range(0.8f, 15f);
-                var p = CandyProp(i % 7, center + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r), Random.Range(0.75f, 1.35f), root);
-                var bob = p.gameObject.AddComponent<FloatBob>();
-                bob.amplitude = Random.Range(0.15f, 0.35f); bob.speed = Random.Range(0.4f, 0.8f);
-                bob.spin = Random.Range(-14f, 14f); bob.phase = Random.Range(0f, 6.28f);
-            }
-        }
-
-        static void BuildSkyCandy(Vector3 center, Transform root)
-        {
-            // Giant candy outside the glass for depth.
-            int n = 22;
-            for (int i = 0; i < n; i++)
-            {
-                float a = (i / (float)n) * Mathf.PI * 2f + Random.Range(-0.12f, 0.12f);
-                float r = Random.Range(20f, 34f);
-                float y = Random.Range(-6f, 26f);
-                var p = CandyProp(i % 7, center + new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r), Random.Range(2.2f, 4.2f), root);
-                var bob = p.gameObject.AddComponent<FloatBob>();
-                bob.amplitude = Random.Range(0.4f, 0.9f); bob.speed = Random.Range(0.2f, 0.4f);
-                bob.spin = Random.Range(-6f, 6f); bob.phase = Random.Range(0f, 6.28f);
-            }
-        }
-
         static Material SparkleParticleMat(bool additive = true)
         {
             var m = new Material(Shader.Find("Crunchee/Particle")) { name = additive ? "SparkleAdd" : "SparkleAlpha" };
@@ -347,10 +338,12 @@ namespace Crunchee.EditorTools
             float min = Mathf.Min(s.x, Mathf.Min(s.y, s.z));
             if (min < 1e-4f) return;
             float r = radius > 0f ? Mathf.Min(radius, min * 0.49f) : Mathf.Min(0.12f, min * 0.3f);
-            string key = $"RBox_{s.x:0.###}_{s.y:0.###}_{s.z:0.###}_{r:0.###}";
+            // Big slabs (the squishies) get a dense grid so the shader dent can bend them.
+            float cell = s.x > 1.2f && s.z > 1.2f ? 0.16f : 0f;
+            string key = $"RBox_{s.x:0.###}_{s.y:0.###}_{s.z:0.###}_{r:0.###}" + (cell > 0f ? "_g" : "");
             if (!meshCache.TryGetValue(key, out var mesh))
             {
-                mesh = SaveMesh(RoundedBoxMesh(s, r, 4, s), key);
+                mesh = SaveMesh(RoundedBoxMesh(s, r, 4, s, cell), key);
                 meshCache[key] = mesh;
             }
             mf.sharedMesh = mesh;
@@ -365,7 +358,7 @@ namespace Crunchee.EditorTools
             return m;
         }
 
-        static Mesh RoundedBoxMesh(Vector3 size, float r, int seg, Vector3 unscale)
+        static Mesh RoundedBoxMesh(Vector3 size, float r, int seg, Vector3 unscale, float cell = 0f)
         {
             Vector3 h = size * 0.5f;
             var verts = new List<Vector3>(); var norms = new List<Vector3>();
@@ -374,6 +367,8 @@ namespace Crunchee.EditorTools
             {
                 var c = new List<float>();
                 for (int k = 0; k <= seg; k++) c.Add(-half + r * (1f - Mathf.Cos(k * Mathf.PI * 0.5f / seg)));
+                int inner = cell > 0f ? Mathf.FloorToInt(2f * (half - r) / cell) : 0;
+                for (int k = 1; k < inner; k++) c.Add(Mathf.Lerp(-half + r, half - r, k / (float)inner));
                 for (int k = seg; k >= 0; k--) c.Add(half - r * (1f - Mathf.Cos(k * Mathf.PI * 0.5f / seg)));
                 return c.ToArray();
             }
@@ -412,6 +407,7 @@ namespace Crunchee.EditorTools
                     }
             }
             var mesh = new Mesh();
+            if (verts.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.SetVertices(verts); mesh.SetNormals(norms); mesh.SetUVs(0, uvs); mesh.SetTriangles(tris, 0);
             mesh.RecalculateBounds(); mesh.RecalculateTangents();
             return mesh;

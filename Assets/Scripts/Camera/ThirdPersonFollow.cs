@@ -3,35 +3,44 @@ using UnityEngine;
 namespace Crunchee.CameraRig
 {
     /// <summary>
-    /// Third-person follow (Faith, Nov 3, replacing the spiral orbit cam):
-    /// you play AS the bunny. The camera rides directly BEHIND her and turns
-    /// with her facing, so you always see her back and where she's headed -
-    /// never a side or front view from some other angle. The camera yaw
-    /// chases her facing smoothly (she only turns while moving), and the
-    /// position eases after it, so swings feel soft, not snapped.
+    /// Fixed-view follow (Faith, Nov 6: "the character can face any
+    /// direction, but the surrounding and top view stays the same - match the
+    /// video"). The camera hangs high behind the course and looks down the
+    /// climb at a constant angle. It only slides to keep up with her; it never
+    /// turns when she turns, so she can spin freely while the world stays put.
     /// </summary>
     public class ThirdPersonFollow : MonoBehaviour
     {
         public Transform target;
-        public float followDistance = 4.6f; // behind her
-        public float followHeight = 2.6f;   // above her - over-the-shoulder height
-        public float lookAhead = 1.8f;      // aim this far in front of her
-        public float aimHeight = 0.9f;      // aim at her head height
-        public float yawDamp = 2.8f;
-        public float posDamp = 5.0f;
+        [Tooltip("Course direction the view looks along (degrees around Y).")]
+        public float fixedYaw = 0f;
+        [Tooltip("Camera position relative to her feet, in course space.")]
+        public Vector3 viewOffset = new Vector3(0f, 5.4f, -5.4f);
+        [Tooltip("Point the camera aims at, relative to her feet, in course space.")]
+        public Vector3 aimOffset = new Vector3(0f, 0.6f, 1.8f);
+        public float posDamp = 6f;      // sideways / forward follow
+        public float heightDamp = 3.5f; // softer vertical follow so jumps don't shake the view
 
-        float yaw;
-        bool yawInit;
+        public Quaternion ViewRotation
+        {
+            get
+            {
+                var yaw = Quaternion.Euler(0f, fixedYaw, 0f);
+                return Quaternion.LookRotation(yaw * (aimOffset - viewOffset));
+            }
+        }
+
+        public Vector3 DesiredPosition => target ? target.position + Quaternion.Euler(0f, fixedYaw, 0f) * viewOffset : transform.position;
 
         void LateUpdate()
         {
             if (!target) return;
-            if (!yawInit) { yaw = target.eulerAngles.y; yawInit = true; }
-            yaw = Mathf.LerpAngle(yaw, target.eulerAngles.y, 1f - Mathf.Exp(-yawDamp * Time.deltaTime));
-            var fwd = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
-            Vector3 desired = target.position - fwd * followDistance + Vector3.up * followHeight;
-            transform.position = Vector3.Lerp(transform.position, desired, 1f - Mathf.Exp(-posDamp * Time.deltaTime));
-            transform.LookAt(target.position + fwd * lookAhead + Vector3.up * aimHeight);
+            var want = DesiredPosition;
+            var p = transform.position;
+            float k = 1f - Mathf.Exp(-posDamp * Time.deltaTime);
+            float ky = 1f - Mathf.Exp(-heightDamp * Time.deltaTime);
+            transform.position = new Vector3(Mathf.Lerp(p.x, want.x, k), Mathf.Lerp(p.y, want.y, ky), Mathf.Lerp(p.z, want.z, k));
+            transform.rotation = ViewRotation;
         }
     }
 }

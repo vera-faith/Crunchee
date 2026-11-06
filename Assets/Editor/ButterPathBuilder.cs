@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -30,8 +31,13 @@ namespace Crunchee.EditorTools
         // Mockup proportions: a butter bar is LONG across the path (~2.6x its depth).
         const float ButterW = 4.4f, ButterH = 0.62f, ButterD = 1.7f, PatH = 0.14f;
         const float StepAdvance = ButterD + 0.18f; // edges nearly touch: walk straight across
-        // Spiral staircase (Faith, Nov 3): the path winds up a center tower.
-        const float SpiralCenterZ = 6.4f, SpiralR = 4.6f, SpiralStepDeg = 36f, SpiralRise = 0.55f, SpiralDepth = 3.1f;
+        // Straight climb (Nov 6, "match the view of the video"): every step is
+        // one slot further along +Z and 0.55 higher, under a fixed camera.
+        // Slot 10 is the checkpoint pad (it gets extra room on both sides).
+        const float StepDepth = 2.2f, PathAdvance = 2.3f, PathStartZ = 3.15f, PathRise = 0.55f, HallHalfW = 8f;
+        static float SlotZ(int i) => PathStartZ + i * PathAdvance + (i >= 10 ? 1f : 0f) + (i >= 11 ? 1f : 0f);
+        static Vector3 SlotPos(int i) => new Vector3(i == 10 ? 0f : Mathf.Sin(i * 1.37f) * 0.6f, 0.35f + i * PathRise, SlotZ(i));
+        static float SlotYaw(int i) => i == 10 ? 0f : Mathf.Sin(i * 0.83f + 0.6f) * 4f;
 
         static Material Mat(string name, Color c, float alpha = 1f, float smoothness = 0.35f)
         {
@@ -80,34 +86,38 @@ namespace Crunchee.EditorTools
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional; sun.intensity = 1.0f;
             sun.color = new Color(1f, 0.84f, 0.7f);
-            sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+            sun.transform.rotation = Quaternion.Euler(58f, 10f, 0f); // from behind the camera: steps no longer shade each other
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.8f;
+            sun.shadowStrength = 0.6f;
             sun.shadowBias = 0.02f;
             sun.shadowNormalBias = 0.04f;
             AddFillLight();
 
-            // --- The room (Faith, Nov 3): the path is now a SPIRAL STAIRCASE
-            // winding up a center tower inside a round, dreamy checkered room
-            // (the reference videos' pink checkerboard world). ---
-            var center = new Vector3(0f, 0f, SpiralCenterZ);
+            // --- The candy hall (Nov 6): one straight climb up +Z ---
+            int slots = 10 + 1 + CandyPath().Length;
+            float zMin = -7f, zMax = SlotZ(slots) + 9f;
+            float topY = SlotPos(slots).y;
 
-            // Floor: one big round pastel plate the tower stands on.
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            // Floor: long checker slab, solid (step off the path and you land on it).
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             floor.name = "RoomFloor";
-            floor.transform.position = center + new Vector3(0f, -0.21f, 0f);
-            floor.transform.localScale = new Vector3(30f, 0.15f, 30f);
-            floor.GetComponent<MeshRenderer>().material = CheckerFloorMat();
-            Object.DestroyImmediate(floor.GetComponent<Collider>());
-            floor.AddComponent<MeshCollider>(); // the floor MUST be solid - step off the path and you land on it. (Bug found Nov 3: the collider was destroyed with the props', and she fell 41,720 units into the void.)
+            floor.transform.position = new Vector3(0f, -0.3f, (zMin + zMax) / 2f);
+            floor.transform.localScale = new Vector3(HallHalfW * 2f, 0.2f, zMax - zMin);
+            var floorMat = CheckerFloorMat();
+            floorMat.mainTextureScale = new Vector2(HallHalfW * 2f / 3f, (zMax - zMin) / 3f);
+            floor.GetComponent<MeshRenderer>().material = floorMat;
 
-            // Glass tower + glowing pillars + sunset sky + floating candy (reference videos).
-            BuildSunsetTower(center);
+            BuildCandyHall(zMin, zMax, topY);
 
-            var butterMat = Mat("Butter", new Color(0.98f, 0.86f, 0.66f), 1f, 0.75f);
+            // Butter: soft pale-yellow blocks (Faith's reference image), squishy dent on.
+            var butterMat = Mat("Butter", new Color(0.99f, 0.88f, 0.6f), 1f, 0.7f);
             butterMat.mainTexture = ButterSwirlTexture();
-            var patMat = Mat("ButterPat", new Color(0.99f, 0.88f, 0.68f), 1f, 0.8f);
+            butterMat.SetFloat("_DentAmount", 1f);
+            butterMat.SetFloat("_RimStrength", 0.2f);
+            var patMat = Mat("ButterPat", new Color(1f, 0.9f, 0.63f), 1f, 0.75f);
             patMat.mainTexture = ButterSwirlTexture();
+            patMat.SetFloat("_DentAmount", 1f);
+            patMat.SetFloat("_RimStrength", 0.2f);
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
 
@@ -118,69 +128,45 @@ namespace Crunchee.EditorTools
             Box("StartPlatform", new Vector3(0f, 0.29f, 0f), new Vector3(4f, 0.4f, 4f), frostingMat);
             SprinkleTops(new Vector3(0f, 0.5f, 0f), 1.8f, 44);
 
-            // --- The spiral: 10 wax butters winding UP around the tower.
-            // Butter i sits at angle -90 + (i-1)*36 degrees on a 4.6-radius
-            // circle, rising 0.55 per step (Faith, Nov 3: spread the path out -
-            // farther apart, not stacked on top of each other). Depth 3.1 vs
-            // the 2.84 chord keeps a whisker of overlap, so there is still
-            // no gap to fall through on the walk band. ---
-            Vector3 lastPos = Vector3.zero; float lastAngle = 0f;
+            // --- Stage 1: the 10 wax butters ---
+            Vector3 lastPos = Vector3.zero;
             int idx = 0;
             foreach (var s in LevelPath.ButterPath())
             {
-                float angDeg = -90f + idx * SpiralStepDeg;
-                float ang = angDeg * Mathf.Deg2Rad;
-                var p = new Vector3(center.x + Mathf.Cos(ang) * SpiralR,
-                                    0.35f + idx * SpiralRise,
-                                    center.z + Mathf.Sin(ang) * SpiralR);
-                BuildButter(p, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat, patMat, -angDeg, SpiralDepth);
-                lastPos = p; lastAngle = ang; idx++;
+                var p = SlotPos(idx);
+                BuildButter(p, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat, patMat, SlotYaw(idx), StepDepth);
+                lastPos = p; idx++;
             }
 
-            // --- Stage 2 (Candy Path): a checkpoint pad in the next spiral slot,
-            // then ten candy squishies from the reference videos keep climbing.
-            // The Butter Path itself stays exactly the 10 wax butters. ---
-            {
-                float padDeg = -90f + idx * SpiralStepDeg, padAng = padDeg * Mathf.Deg2Rad;
-                BuildCheckpointPad(new Vector3(center.x + Mathf.Cos(padAng) * SpiralR,
-                                               0.35f + idx * SpiralRise,
-                                               center.z + Mathf.Sin(padAng) * SpiralR), -padDeg);
-                idx++;
-            }
+            // --- Checkpoint pad, then Stage 2 (Candy Path) ---
+            BuildCheckpointPad(SlotPos(idx), SlotYaw(idx));
+            idx++;
             int candyN = 0;
             foreach (var def in CandyPath())
             {
-                float angDeg = -90f + idx * SpiralStepDeg;
-                float ang = angDeg * Mathf.Deg2Rad;
-                var p = new Vector3(center.x + Mathf.Cos(ang) * SpiralR,
-                                    0.35f + idx * SpiralRise,
-                                    center.z + Mathf.Sin(ang) * SpiralR);
-                BuildCandyStep(p, ++candyN, def, -angDeg, SpiralDepth);
-                lastPos = p; lastAngle = ang; idx++;
+                var p = SlotPos(idx);
+                BuildCandyStep(p, ++candyN, def, SlotYaw(idx), StepDepth);
+                lastPos = p; idx++;
             }
 
-            // --- Finish platform: one more rise past butter 10, along its tangent ---
-            var tangent = new Vector3(-Mathf.Sin(lastAngle), 0f, Mathf.Cos(lastAngle));
-            var finishPos = lastPos + tangent * 3.3f;
-            finishPos.y = lastPos.y + SpiralRise + 0.15f;
-            float finishYaw = -lastAngle * Mathf.Rad2Deg;
+            // --- Finish platform: one more rise past the last step ---
+            var finishPos = new Vector3(0f, lastPos.y + PathRise + 0.15f, lastPos.z + StepDepth / 2f + 0.1f + 2.1f);
+            float finishYaw = 0f;
             var finish = Box("FinishPlatform", finishPos, new Vector3(4.2f, 0.4f, 4.2f), platformMat);
-            finish.transform.rotation = Quaternion.Euler(0f, finishYaw, 0f);
             // The trigger is its own invisible zone ABOVE the solid platform,
             // so she can stand on the platform AND trip the finish.
             var zone = Box("FinishZone", finishPos + new Vector3(0f, 1.1f, 0f), new Vector3(4.2f, 2.2f, 4.2f), platformMat);
             Object.DestroyImmediate(zone.GetComponent<MeshRenderer>());
             zone.GetComponent<Collider>().isTrigger = true;
             zone.AddComponent<FinishTrigger>();
-            BuildDreamyRoom(center, finishPos, finishYaw);
+            BuildDreamyRoom(finishPos, finishYaw, zMin, zMax);
 
             // --- Player: Pudding Bunny ---
             var player = BuildPuddingBunny(new Vector3(0f, 1.0f, 0f));
             var pc = player.GetComponent<PlayerController>();
 
-            // --- Camera: behind-the-bunny third person (Faith, Nov 3) - rides
-            // directly behind her, turning with her facing, so she plays AS
-            // the bunny and sees her back + where she's headed ---
+            // --- Camera: FIXED high view looking up the climb (Nov 6). It
+            // follows her position only - never her facing. ---
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
             var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.Skybox;
@@ -188,15 +174,12 @@ namespace Crunchee.EditorTools
             cam.allowHDR = true;
             cam.allowMSAA = true;
             cam.farClipPlane = 260f;
+            cam.fieldOfView = 58f;
             camGo.AddComponent<CruncheePostFX>().shader = Shader.Find("Hidden/Crunchee/PostFX");
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
-            follow.followDistance = 4.6f;
-            follow.followHeight = 2.6f;
-            follow.lookAhead = 1.8f;
-            follow.aimHeight = 0.9f;
-            camGo.transform.position = new Vector3(0f, 3.6f, -4.6f); // exactly the first-frame follow spot (she spawns facing +Z) - no snap
+            camGo.transform.SetPositionAndRotation(follow.DesiredPosition, follow.ViewRotation);
             pc.cameraRig = camGo.transform;
 
             // --- Audio root ---
@@ -238,79 +221,84 @@ namespace Crunchee.EditorTools
             group.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
 
             var step = ChildBox(group.transform, "Body", Vector3.zero, new Vector3(ButterW, ButterH, depth), butterMat, true);
+            Roundify(step, 0.2f); // soft, well-rounded butter block (reference image)
 
-            // Little serving TRAY under the bar (mockup: every butter sits on one).
+            // Clear plastic serving tray under the block (reference image).
+            var trayMat = Mat("TrayClear", new Color(0.95f, 0.96f, 1f), 0.4f, 0.95f);
+            trayMat.SetFloat("_RimStrength", 0.45f);
+            trayMat.SetFloat("_SpecStrength", 1.4f);
             ChildBox(step.transform, "Tray",
-                     new Vector3(0f, (-ButterH / 2f - 0.035f) / ButterH, 0f),
-                     new Vector3((ButterW + 0.55f) / ButterW, 0.07f / ButterH, (depth + 0.45f) / depth),
-                     Mat("Tray", new Color(0.96f, 0.95f, 0.94f), 1f, 0.9f), false);
+                     new Vector3(0f, (-ButterH / 2f - 0.03f) / ButterH, 0f),
+                     new Vector3((ButterW + 0.5f) / ButterW, 0.1f / ButterH, (depth + 0.42f) / depth),
+                     trayMat, false);
 
             // Butter pat: the thinner slab on top of a real butter stick.
-            ChildBox(step.transform, "Pat",
-                     new Vector3(0f, (ButterH / 2f + PatH / 2f) / ButterH, 0f),
-                     new Vector3(0.94f, PatH / ButterH, 0.92f), patMat, false);
+            var pat = ChildBox(step.transform, "Pat",
+                     new Vector3(0f, (ButterH / 2f + PatH / 2f - 0.02f) / ButterH, 0f),
+                     new Vector3(0.96f, PatH / ButterH, 0.95f), patMat, false);
+            Roundify(pat, 0.07f);
 
-            // Collider reaches the pat top so the player stands on the pat/shell.
-            var col = step.GetComponent<BoxCollider>();
-            col.size = new Vector3(1f, (ButterH + PatH) / ButterH, 1f);
-            col.center = new Vector3(0f, (PatH / 2f) / ButterH, 0f);
-
-            Material shellMat; Color particleColor; string shellName; bool crackable;
+            Material shellMat; Color particleColor; string shellName; bool crackable; float shellT;
             switch (coating)
             {
                 case Coating.Sugar:
                     shellMat = Mat("SugarShell", new Color(1f, 0.93f, 0.95f), 0.88f, 0.9f);
-                    particleColor = new Color(1f, 0.8f, 0.88f); shellName = "SugarShell"; crackable = false; break;
+                    particleColor = new Color(1f, 0.8f, 0.88f); shellName = "SugarShell"; crackable = false; shellT = 0.12f; break;
                 case Coating.Honey:
                     shellMat = Mat("HoneyShell", new Color(1f, 0.62f, 0.12f), 0.5f, 1f);
-                    particleColor = new Color(1f, 0.7f, 0.25f); shellName = "HoneyShell"; crackable = false; break;
+                    particleColor = new Color(1f, 0.7f, 0.25f); shellName = "HoneyShell"; crackable = false; shellT = 0.12f; break;
                 case Coating.NailPolish:
                     shellMat = Mat("PolishShell", polishColor == default ? new Color(1f, 0.62f, 0.72f) : polishColor, 1f, 1f);
-                    particleColor = shellMat.color; shellName = "PolishShell"; crackable = true; break;
-                default: // Wax: translucent build-up. Build-1 playtest fix: the
-                    // old curve hit 0.88 alpha and read as opaque grey roof
-                    // tiles on the phone - cap it at 0.6 and warm the color so
-                    // the golden butter shows through every layer.
-                    float alpha = Mathf.Min(0.6f, 0.08f + (waxLayers - 1) * 0.058f);
-                    shellMat = Mat($"Wax{waxLayers}", new Color(1f, 0.97f, 0.9f), alpha, 0.45f);
-                    particleColor = Color.white; shellName = "WaxShell"; crackable = true; break;
+                    particleColor = shellMat.color; shellName = "PolishShell"; crackable = true; shellT = 0.08f; break;
+                default: // Wax: a clear glossy coat that thickens and frosts with every layer.
+                    float alpha = 0.22f + waxLayers * 0.035f;
+                    shellMat = Mat($"Wax{waxLayers}", new Color(1f, 0.985f, 0.95f), alpha, 0.93f);
+                    shellMat.SetFloat("_RimStrength", 0.22f);
+                    shellMat.SetFloat("_SpecStrength", 1.5f);
+                    particleColor = Color.white; shellName = "WaxShell"; crackable = true; shellT = 0.1f + waxLayers * 0.012f; break;
             }
+            shellMat.SetFloat("_DentAmount", 1f);
 
-            // Thin rim so translucent wax stays see-through at grazing camera angles.
-            if (shellMat.color.a < 1f) { shellMat.SetFloat("_RimStrength", 0.1f); shellMat.SetFloat("_SpecStrength", 0.9f); }
+            // Collider reaches the shell top so she stands ON the wax.
+            var col = step.GetComponent<BoxCollider>();
+            col.size = new Vector3(1f, (ButterH + PatH + shellT) / ButterH, 1f);
+            col.center = new Vector3(0f, ((PatH + shellT) / 2f) / ButterH, 0f);
 
-            // Shell group sits on the pat. Wax/polish = a grid of small
-            // plates (they split apart on the first landing); sugar/honey = one soft piece.
+            // Shell group sits on the pat. Wax/polish = irregular glassy plates
+            // (Voronoi shards, like real cracked wax) that split on landing;
+            // sugar/honey = one soft piece.
             var shell = new GameObject(shellName);
             shell.transform.SetParent(step.transform, false);
-            shell.transform.localPosition = new Vector3(0f, (ButterH / 2f + PatH + ButterH * 0.2f) / ButterH, 0f);
-            float shellW = ButterW * 1.02f, shellD = depth * 1.02f, shellH = ButterH * 0.5f;
+            shell.transform.localPosition = new Vector3(0f, (ButterH / 2f + PatH - 0.02f) / ButterH, 0f);
+            float shellW = ButterW * 1.01f, shellD = depth * 1.01f;
             if (crackable)
             {
-                // The shell is a GRID of small plates, not 4 big quadrants
-                // (Faith, Nov 3: "its just breaking apart into 4 pieces, but
-                // it needs to break more") - 4 across x 3 deep for wax,
-                // 3 x 2 for polish. On landing every piece flies radially
-                // out from the center (Squishy.CrackShell).
-                int nx = coating == Coating.Wax ? 4 : 3;
+                int nx = coating == Coating.Wax ? 3 + (waxLayers + 1) / 3 : 3;
                 int nz = coating == Coating.Wax ? 3 : 2;
-                float gap = 0.05f;
-                for (int ix = 0; ix < nx; ix++)
-                    for (int iz = 0; iz < nz; iz++)
-                    {
-                        float cx = ((ix + 0.5f) * (shellW / nx) - shellW / 2f) / ButterW;
-                        float cz = ((iz + 0.5f) * (shellD / nz) - shellD / 2f) / depth;
-                        ChildBox(shell.transform, "ShellPiece",
-                                 new Vector3(cx, 0f, cz),
-                                 new Vector3((shellW / nx - gap) / ButterW, shellH / ButterH, (shellD / nz - gap) / depth),
-                                 shellMat, false);
-                    }
+                var cells = VoronoiCells(shellW, shellD, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, 0.012f);
+                var meshes = new List<Mesh>();
+                for (int ci = 0; ci < cells.Count; ci++)
+                {
+                    var cell = cells[ci];
+                    var c = Vector2.zero; foreach (var v in cell) c += v; c /= cell.Count;
+                    var m = PrismMesh(cell, c, shellT, Mathf.Min(0.035f, shellT * 0.3f));
+                    m.name = $"{name}_Shard{ci:00}";
+                    meshes.Add(m);
+                    var piece = new GameObject("ShellPiece");
+                    piece.transform.SetParent(shell.transform, false);
+                    piece.transform.localPosition = new Vector3(c.x / ButterW, (shellT / 2f) / ButterH, c.y / depth);
+                    piece.transform.localScale = new Vector3(1f / ButterW, 1f / ButterH, 1f / depth);
+                    piece.AddComponent<MeshFilter>().sharedMesh = m;
+                    piece.AddComponent<MeshRenderer>().sharedMaterial = shellMat;
+                }
+                SaveMeshGroup(meshes, $"WaxShards_{name}");
             }
             else
             {
-                ChildBox(shell.transform, "Shell", Vector3.zero,
-                         new Vector3(shellW / ButterW, shellH / ButterH, shellD / depth), shellMat, false);
+                ChildBox(shell.transform, "Shell", new Vector3(0f, (shellT / 2f) / ButterH, 0f),
+                         new Vector3(shellW / ButterW, shellT / ButterH, shellD / depth), shellMat, false);
             }
+            float shellTopLocal = (ButterH / 2f + PatH - 0.02f + shellT) / ButterH;
 
             // Crack decal: an invisible plane hugging the shell top. The Squishy
             // draws crack lines into its texture wherever the character walks,
@@ -321,13 +309,14 @@ namespace Crunchee.EditorTools
                 var decalMat = Mat("CrackDecal", Color.white, 0.99f, 0.5f);
                 decalMat.renderQueue = 3002;
                 NoSheen(decalMat);
+                decalMat.SetFloat("_DentAmount", 1f);
                 // Starts clear: Squishy draws cracks into a runtime texture; without
                 // this the decal shows as a solid white slab until Awake.
                 decalMat.mainTexture = LoadOrCreateTexture("Assets/Textures/Clear.png", 4, 4, (x, y, w, h) => Color.clear);
                 var decal = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 decal.name = "CrackDecal";
                 decal.transform.SetParent(step.transform, false);
-                decal.transform.localPosition = new Vector3(0f, (ButterH / 2f + PatH + ButterH * 0.2f + ButterH * 0.25f + 0.012f) / ButterH, 0f);
+                decal.transform.localPosition = new Vector3(0f, shellTopLocal + 0.008f / ButterH, 0f);
                 decal.transform.localScale = new Vector3(0.1f, 1f, 0.1f);
                 decal.GetComponent<MeshRenderer>().material = decalMat;
                 Object.DestroyImmediate(decal.GetComponent<Collider>());
@@ -335,22 +324,23 @@ namespace Crunchee.EditorTools
             }
 
             // Dent decal: a soft shadow disc that follows the character on the
-            // squishy, deepening as she sinks - you can SEE her sinking into it
-            // wherever she moves (Faith, Nov 3). Sits just under the crack plane.
+            // squishy, deepening as she sinks. Sits just under the crack plane.
             MeshRenderer dentRend = null;
             {
                 var dentMat = Mat("Dent", Color.white, 0.99f, 0.5f);
                 dentMat.mainTexture = DentTexture();
                 dentMat.renderQueue = 3001;
                 NoSheen(dentMat);
+                dentMat.SetFloat("_DentAmount", 1f);
                 var dent = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 dent.name = "DentDecal";
                 dent.transform.SetParent(step.transform, false);
-                dent.transform.localPosition = new Vector3(0f, (ButterH / 2f + PatH + ButterH * 0.2f + ButterH * 0.25f + 0.006f) / ButterH, 0f);
+                dent.transform.localPosition = new Vector3(0f, shellTopLocal + 0.004f / ButterH, 0f);
                 dent.transform.localScale = new Vector3(0.15f / ButterW, 1f, 0.15f / depth);
                 dent.GetComponent<MeshRenderer>().material = dentMat;
                 Object.DestroyImmediate(dent.GetComponent<Collider>());
                 dentRend = dent.GetComponent<MeshRenderer>();
+                dentRend.enabled = false; // only shows while she stands on it
             }
 
             var sq = step.AddComponent<Squishy>();
@@ -369,6 +359,105 @@ namespace Crunchee.EditorTools
             sq.stepParticles = ps;
             sq.pathOrder = ++pathCounter;
             sq.shardMaterial = Mat("WaxChip", new Color(1f, 0.98f, 0.94f), 0.92f, 0.7f);
+        }
+
+        /// <summary>Irregular convex plates covering a w x d rectangle: Voronoi
+        /// cells of a jittered nx x nz seed grid, each shrunk by a hairline gap.</summary>
+        static List<List<Vector2>> VoronoiCells(float w, float d, int nx, int nz, int seed, float gap)
+        {
+            var rng = new System.Random(seed);
+            var seeds = new List<Vector2>();
+            for (int ix = 0; ix < nx; ix++)
+                for (int iz = 0; iz < nz; iz++)
+                    seeds.Add(new Vector2(-w / 2f + (ix + 0.5f + ((float)rng.NextDouble() - 0.5f) * 0.75f) * w / nx,
+                                          -d / 2f + (iz + 0.5f + ((float)rng.NextDouble() - 0.5f) * 0.75f) * d / nz));
+            var cells = new List<List<Vector2>>();
+            for (int i = 0; i < seeds.Count; i++)
+            {
+                var poly = new List<Vector2> { new Vector2(-w / 2f, -d / 2f), new Vector2(w / 2f, -d / 2f), new Vector2(w / 2f, d / 2f), new Vector2(-w / 2f, d / 2f) };
+                for (int j = 0; j < seeds.Count && poly.Count > 2; j++)
+                {
+                    if (j == i) continue;
+                    var n = seeds[j] - seeds[i]; var mid = (seeds[i] + seeds[j]) * 0.5f;
+                    var outPoly = new List<Vector2>();
+                    for (int k = 0; k < poly.Count; k++)
+                    {
+                        var A = poly[k]; var B = poly[(k + 1) % poly.Count];
+                        float da = Vector2.Dot(A - mid, n), db = Vector2.Dot(B - mid, n);
+                        if (da <= 0f) outPoly.Add(A);
+                        if ((da < 0f && db > 0f) || (da > 0f && db < 0f)) outPoly.Add(Vector2.Lerp(A, B, da / (da - db)));
+                    }
+                    poly = outPoly;
+                }
+                if (poly.Count < 3) continue;
+                var c = Vector2.zero; foreach (var v in poly) c += v; c /= poly.Count;
+                for (int k = 0; k < poly.Count; k++) poly[k] += (c - poly[k]).normalized * gap;
+                cells.Add(poly);
+            }
+            return cells;
+        }
+
+        /// <summary>A plate mesh: convex polygon extruded to thickness t, with a
+        /// small bevel on the top edge so every shard catches a glossy highlight.
+        /// Vertices are relative to centre c (world units).</summary>
+        static Mesh PrismMesh(List<Vector2> poly, Vector2 c, float t, float bevel)
+        {
+            var verts = new List<Vector3>(); var norms = new List<Vector3>(); var uvs = new List<Vector2>(); var tris = new List<int>();
+            int n = poly.Count; float hy = t / 2f;
+            var outer = new Vector3[n]; var inner = new Vector3[n];
+            for (int k = 0; k < n; k++)
+            {
+                var p = poly[k] - c;
+                outer[k] = new Vector3(p.x, 0f, p.y);
+                var q = p + (-p).normalized * Mathf.Min(bevel, p.magnitude * 0.4f);
+                inner[k] = new Vector3(q.x, 0f, q.y);
+            }
+            void Tri(int a, int b, int d, Vector3 want)
+            {
+                if (Vector3.Dot(Vector3.Cross(verts[b] - verts[a], verts[d] - verts[a]), want) < 0f) { int tmp = b; b = d; d = tmp; }
+                tris.Add(a); tris.Add(b); tris.Add(d);
+            }
+            int V(Vector3 pos, Vector3 nrm) { verts.Add(pos); norms.Add(nrm); uvs.Add(new Vector2(pos.x * 0.3f + 0.5f, pos.z * 0.3f + 0.5f)); return verts.Count - 1; }
+            // top
+            int ctop = V(Vector3.up * hy, Vector3.up);
+            var top = new int[n];
+            for (int k = 0; k < n; k++) top[k] = V(inner[k] + Vector3.up * hy, Vector3.up);
+            for (int k = 0; k < n; k++) Tri(ctop, top[k], top[(k + 1) % n], Vector3.up);
+            // bottom
+            int cbot = V(Vector3.down * hy, Vector3.down);
+            var bot = new int[n];
+            for (int k = 0; k < n; k++) bot[k] = V(outer[k] + Vector3.down * hy, Vector3.down);
+            for (int k = 0; k < n; k++) Tri(cbot, bot[k], bot[(k + 1) % n], Vector3.down);
+            // bevel + sides, flat per edge
+            for (int k = 0; k < n; k++)
+            {
+                int k2 = (k + 1) % n;
+                var edge = outer[k2] - outer[k];
+                var side = Vector3.Cross(edge, Vector3.up).normalized;
+                if (Vector3.Dot(side, outer[k] + outer[k2]) < 0f) side = -side;
+                var bn = (side + Vector3.up).normalized;
+                float yb = hy - bevel;
+                int b0 = V(inner[k] + Vector3.up * hy, bn), b1 = V(inner[k2] + Vector3.up * hy, bn);
+                int b2 = V(outer[k] + Vector3.up * yb, bn), b3 = V(outer[k2] + Vector3.up * yb, bn);
+                Tri(b0, b2, b1, bn); Tri(b1, b2, b3, bn);
+                int s0 = V(outer[k] + Vector3.up * yb, side), s1 = V(outer[k2] + Vector3.up * yb, side);
+                int s2 = V(outer[k] + Vector3.down * hy, side), s3 = V(outer[k2] + Vector3.down * hy, side);
+                Tri(s0, s2, s1, side); Tri(s1, s2, s3, side);
+            }
+            var m = new Mesh();
+            m.SetVertices(verts); m.SetNormals(norms); m.SetUVs(0, uvs); m.SetTriangles(tris, 0);
+            m.RecalculateBounds(); m.RecalculateTangents();
+            return m;
+        }
+
+        /// <summary>Saves several meshes as ONE asset file (regenerated on every build).</summary>
+        static void SaveMeshGroup(List<Mesh> meshes, string fileName)
+        {
+            if (meshes.Count == 0) return;
+            string path = $"{GeneratedMeshDir}/{fileName}.asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(meshes[0], path);
+            for (int i = 1; i < meshes.Count; i++) AssetDatabase.AddObjectToAsset(meshes[i], meshes[0]);
         }
 
         /// <summary>Primitive cube as a LOCAL child - no world-space parenting
@@ -408,14 +497,33 @@ namespace Crunchee.EditorTools
             // Gameplay shows her BACK; ears/arms/legs hang off pivots so
             // BunnyBody can flop the ears and raise the arms on jumps and
             // swing the tiny legs while she walks.
-            var pudding = Mat("Pudding", new Color(1f, 0.93f, 0.78f), 1f, 1f);
-            var caramel = Mat("Caramel", new Color(0.78f, 0.4f, 0.1f), 1f, 1f);
-            var brown = Mat("FaceBrown", new Color(0.23f, 0.12f, 0.06f), 1f, 0.7f);
-            var white = Mat("EyeShine", new Color(1f, 1f, 1f), 1f, 0.3f);
-            var blushM = Mat("Blush", new Color(1f, 0.62f, 0.66f), 0.55f, 0.6f);
-            var noseM = Mat("Nose", new Color(0.98f, 0.55f, 0.62f), 1f, 0.5f);
-            var mouthM = Mat("Mouth", new Color(0.36f, 0.12f, 0.12f), 1f, 0.5f);
-            var tongueM = Mat("Tongue", new Color(1f, 0.55f, 0.6f), 1f, 0.6f);
+            // v10 (Faith, Nov 6 reference image): a caramel-glazed chibi bunny.
+            // Golden-cream jelly head that is almost all of her, a glossy
+            // amber caramel pour over the crown with drips all the way round
+            // (the top-down camera sees the crown and back most), long wide
+            // lop ears glazed on top and flaring out at the tips, huge glossy
+            // eyes with two highlights, pink blush, tiny nose and smile, and a
+            // small caramel body with a cream belly.
+            var pudding = Mat("Pudding", new Color(1f, 0.9f, 0.7f), 1f, 0.95f);
+            pudding.EnableKeyword("_EMISSION");
+            pudding.SetColor("_EmissionColor", new Color(0.2f, 0.14f, 0.07f)); // soft jelly glow so the face never goes grey
+            pudding.SetFloat("_RimStrength", 0.28f);
+            pudding.SetColor("_RimColor", new Color(1f, 0.9f, 0.75f));
+            var caramel = Mat("Caramel", new Color(0.76f, 0.44f, 0.14f), 1f, 1f);
+            caramel.SetFloat("_SpecStrength", 1.8f);
+            caramel.SetFloat("_RimStrength", 0.2f);
+            caramel.SetColor("_RimColor", new Color(1f, 0.7f, 0.4f));
+            var caramelLight = Mat("CaramelLight", new Color(0.93f, 0.66f, 0.32f), 1f, 1f);
+            caramelLight.SetFloat("_SpecStrength", 1.6f);
+            var eyeM = Mat("EyeDark", new Color(0.12f, 0.06f, 0.03f), 1f, 1f);
+            eyeM.SetFloat("_SpecStrength", 2.2f);
+            var irisM = Mat("EyeIris", new Color(0.36f, 0.18f, 0.07f), 1f, 1f);
+            var shineM = EmissiveMat("EyeShine", Color.white, 0.6f);
+            var blushM = Mat("Blush", new Color(1f, 0.55f, 0.62f), 0.6f, 0.4f);
+            NoSheen(blushM);
+            var noseM = Mat("Nose", new Color(0.95f, 0.5f, 0.58f), 1f, 0.8f);
+            var mouthM = Mat("Mouth", new Color(0.42f, 0.13f, 0.14f), 1f, 0.6f);
+            var tongueM = Mat("Tongue", new Color(1f, 0.56f, 0.62f), 1f, 0.7f);
 
             var player = new GameObject("Player_PuddingBunny") { tag = "Player" }; // FinishTrigger/Checkpoint find her by this tag
             player.transform.position = at;
@@ -429,79 +537,88 @@ namespace Crunchee.EditorTools
             var bob = new GameObject("BodyBob"); bob.transform.SetParent(model.transform, false);
             var bt = bob.transform;
 
-            // One-piece chibi body (v9): a small chubby belly under a HUGE
-            // round head - the reference's proportions are almost all head.
-            Part(PrimitiveType.Sphere, bt, "Body", new Vector3(0f, 0.3f, 0f), new Vector3(0.8f, 0.66f, 0.72f), pudding);
-            Part(PrimitiveType.Sphere, bt, "Head", new Vector3(0f, 0.95f, 0f), new Vector3(1.18f, 1.04f, 1.02f), pudding);
-            // Glossy caramel HELMET poured over the head (reference: it
-            // covers the whole top like a cap, continuous with the ears)
-            Part(PrimitiveType.Sphere, bt, "CaramelCap", new Vector3(0f, 1.3f, 0f), new Vector3(1.22f, 0.52f, 1.06f), caramel);
-            // Wavy drip edge across the FOREHEAD - drips of uneven length,
-            // the face below stays clean and open
-            Part(PrimitiveType.Sphere, bt, "HairlineDrip", new Vector3(-0.32f, 1.08f, 0.4f), new Vector3(0.13f, 0.24f, 0.09f), caramel);
-            Part(PrimitiveType.Sphere, bt, "HairlineDrip", new Vector3(-0.16f, 1.05f, 0.45f), new Vector3(0.13f, 0.19f, 0.09f), caramel);
-            Part(PrimitiveType.Sphere, bt, "HairlineDrip", new Vector3(0f, 1.07f, 0.47f), new Vector3(0.13f, 0.22f, 0.09f), caramel);
-            Part(PrimitiveType.Sphere, bt, "HairlineDrip", new Vector3(0.16f, 1.05f, 0.45f), new Vector3(0.13f, 0.19f, 0.09f), caramel);
-            Part(PrimitiveType.Sphere, bt, "HairlineDrip", new Vector3(0.32f, 1.08f, 0.4f), new Vector3(0.13f, 0.24f, 0.09f), caramel);
-            // Caramel COLLAR poured around her neck (reference), with drips
-            // running down the chest - and down her BACK, which is what the
-            // gameplay camera actually sees
-            Part(PrimitiveType.Sphere, bt, "CaramelPour", new Vector3(0f, 0.56f, 0f), new Vector3(0.86f, 0.32f, 0.78f), caramel);
-            foreach (var sx in new[] { -0.3f, -0.15f, 0f, 0.15f, 0.3f })
+            // Body: small glossy caramel body with a cream belly
+            Part(PrimitiveType.Sphere, bt, "Body", new Vector3(0f, 0.31f, 0f), new Vector3(0.64f, 0.6f, 0.56f), caramelLight);
+            Part(PrimitiveType.Sphere, bt, "Belly", new Vector3(0f, 0.29f, 0.12f), new Vector3(0.44f, 0.44f, 0.36f), pudding);
+            // Head + full chubby cheeks
+            Part(PrimitiveType.Sphere, bt, "Head", new Vector3(0f, 0.98f, 0f), new Vector3(1.16f, 1.0f, 1.0f), pudding);
+            foreach (var side in new[] { -1f, 1f })
+                Part(PrimitiveType.Sphere, bt, "Cheek", new Vector3(side * 0.28f, 0.8f, 0.2f), new Vector3(0.52f, 0.42f, 0.46f), pudding);
+            // Caramel pour over the crown
+            Part(PrimitiveType.Sphere, bt, "CaramelCap", new Vector3(0f, 1.25f, -0.03f), new Vector3(1.18f, 0.56f, 1.04f), caramel);
+            // Drips all the way round the crown edge: short over the face,
+            // long down the sides and back.
+            for (int i = 0; i < 14; i++)
             {
-                float zz = 0.31f - Mathf.Abs(sx) * 0.22f;
-                Part(PrimitiveType.Sphere, bt, "CollarDrip", new Vector3(sx, 0.44f, zz), new Vector3(0.13f, 0.2f, 0.09f), caramel);
-                Part(PrimitiveType.Sphere, bt, "CollarDripBack", new Vector3(sx, 0.44f, -zz), new Vector3(0.13f, 0.2f, 0.09f), caramel);
+                float deg = i * (360f / 14f) + 12f;
+                float a = deg * Mathf.Deg2Rad;
+                float front = Mathf.Clamp01((Mathf.Cos(a) - 0.35f) / 0.65f); // 1 = right over the eyes
+                float len = Mathf.Lerp(0.2f + 0.07f * Mathf.Sin(i * 2.3f), 0.07f, front);
+                float topY = 1.1f;
+                float y = topY - len / 2f;
+                float shrink = Mathf.Sqrt(Mathf.Max(0.05f, 1f - Mathf.Pow((y - 0.98f) / 0.5f, 2f)));
+                var outDir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+                var pos = new Vector3(outDir.x * 0.575f * shrink, y, outDir.z * 0.495f * shrink);
+                var d = Part(PrimitiveType.Capsule, bt, "CrownDrip", pos, new Vector3(0.095f, Mathf.Max(0.05f, len * 0.5f), 0.055f), caramel);
+                d.transform.localRotation = Quaternion.Euler(0f, deg, 0f);
+                Part(PrimitiveType.Sphere, bt, "DripBead", pos + Vector3.down * (len * 0.5f - 0.01f), new Vector3(0.105f, 0.095f, 0.07f), caramel);
             }
-            // THE ears (v9, the reference's signature): very long, WIDE lop
-            // ears growing from the top of her head and flopping down beside
-            // her cheeks, caramel poured over their top halves. Each ear
-            // hangs off a PIVOT at the top of her head so BunnyBody can flop
-            // it. No pink inner ear - the reference's ears are cream + caramel.
+            // Caramel collar pour with a few drips down the body
+            Part(PrimitiveType.Sphere, bt, "CaramelPour", new Vector3(0f, 0.57f, 0f), new Vector3(0.72f, 0.22f, 0.64f), caramel);
+            foreach (var deg in new[] { 30f, 95f, 150f, 210f, 265f, 330f })
+            {
+                float a = deg * Mathf.Deg2Rad;
+                var d = Part(PrimitiveType.Capsule, bt, "CollarDrip", new Vector3(Mathf.Sin(a) * 0.3f, 0.47f, Mathf.Cos(a) * 0.27f), new Vector3(0.1f, 0.1f, 0.07f), caramel);
+                d.transform.localRotation = Quaternion.Euler(0f, deg, 0f);
+            }
+            // Long wide lop ears on pivots (BunnyBody flops them), glazed on
+            // top with a drip, flaring out at the tips.
             foreach (var side in new[] { -1f, 1f })
             {
                 string sfx = side < 0f ? "L" : "R";
                 var pivot = new GameObject("EarPivot" + sfx);
                 pivot.transform.SetParent(bt, false);
-                pivot.transform.localPosition = new Vector3(side * 0.42f, 1.38f, -0.02f);
-                pivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 20f);
-                Part(PrimitiveType.Capsule, pivot.transform, "Ear", new Vector3(0f, -0.42f, 0f), new Vector3(0.34f, 0.48f, 0.17f), pudding);
-                Part(PrimitiveType.Capsule, pivot.transform, "EarCaramel", new Vector3(0f, -0.2f, 0f), new Vector3(0.37f, 0.3f, 0.19f), caramel);
+                pivot.transform.localPosition = new Vector3(side * 0.34f, 1.4f, -0.04f);
+                pivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 32f);
+                var pt = pivot.transform;
+                var ear = Part(PrimitiveType.Capsule, pt, "Ear", new Vector3(side * 0.16f, -0.38f, 0f), new Vector3(0.4f, 0.46f, 0.18f), pudding);
+                ear.transform.localRotation = Quaternion.Euler(0f, 0f, side * 14f);
+                var tip = Part(PrimitiveType.Sphere, pt, "EarTip", new Vector3(side * 0.3f, -0.78f, 0f), new Vector3(0.38f, 0.24f, 0.2f), pudding);
+                tip.transform.localRotation = Quaternion.Euler(0f, 0f, side * 30f);
+                var glaze = Part(PrimitiveType.Capsule, pt, "EarCaramel", new Vector3(side * 0.1f, -0.24f, 0f), new Vector3(0.42f, 0.22f, 0.2f), caramel);
+                glaze.transform.localRotation = Quaternion.Euler(0f, 0f, side * 14f);
+                Part(PrimitiveType.Capsule, pt, "EarDrip", new Vector3(side * 0.2f, -0.36f, 0.08f), new Vector3(0.09f, 0.13f, 0.06f), caramel);
+                Part(PrimitiveType.Capsule, pt, "EarDrip", new Vector3(side * 0.04f, -0.32f, -0.08f), new Vector3(0.09f, 0.1f, 0.06f), caramel);
             }
-            // The reference face: big glossy brown eyes with fat sparkles, a
-            // tiny pink nose, an OPEN smile with a little pink tongue, blush
+            // Face: huge glossy eyes with two highlights, blush, nose, smile
             foreach (var side in new[] { -1f, 1f })
             {
-                Part(PrimitiveType.Sphere, bt, "Eye", new Vector3(side * 0.215f, 0.97f, 0.465f), new Vector3(0.115f, 0.15f, 0.06f), brown);
-                Part(PrimitiveType.Sphere, bt, "EyeShine", new Vector3(side * 0.195f, 1.035f, 0.51f), new Vector3(0.05f, 0.065f, 0.03f), white);
-                Part(PrimitiveType.Sphere, bt, "EyeShine2", new Vector3(side * 0.24f, 0.925f, 0.515f), new Vector3(0.025f, 0.03f, 0.02f), white);
-                Part(PrimitiveType.Sphere, bt, "Blush", new Vector3(side * 0.4f, 0.83f, 0.4f), new Vector3(0.18f, 0.11f, 0.03f), blushM);
-                // Soft cheek fullness (reference cheeks are round and full)
-                Part(PrimitiveType.Sphere, bt, "Cheek", new Vector3(side * 0.5f, 0.66f, 0.16f), new Vector3(0.15f, 0.13f, 0.13f), pudding);
+                Part(PrimitiveType.Sphere, bt, "Eye", new Vector3(side * 0.21f, 0.93f, 0.44f), new Vector3(0.17f, 0.21f, 0.08f), eyeM);
+                Part(PrimitiveType.Sphere, bt, "Iris", new Vector3(side * 0.21f, 0.895f, 0.468f), new Vector3(0.11f, 0.12f, 0.035f), irisM);
+                Part(PrimitiveType.Sphere, bt, "EyeShine", new Vector3(side * 0.18f, 0.985f, 0.49f), new Vector3(0.07f, 0.08f, 0.03f), shineM);
+                Part(PrimitiveType.Sphere, bt, "EyeShine2", new Vector3(side * 0.245f, 0.875f, 0.488f), new Vector3(0.032f, 0.032f, 0.02f), shineM);
+                Part(PrimitiveType.Sphere, bt, "Blush", new Vector3(side * 0.33f, 0.79f, 0.445f), new Vector3(0.17f, 0.09f, 0.04f), blushM);
             }
-            Part(PrimitiveType.Sphere, bt, "Nose", new Vector3(0f, 0.885f, 0.505f), new Vector3(0.09f, 0.06f, 0.04f), noseM);
-            // Open smile: a dark mouth sunk into the face so only its front
-            // crescent shows, with the tongue peeking at the bottom
-            Part(PrimitiveType.Sphere, bt, "Mouth", new Vector3(0f, 0.8f, 0.48f), new Vector3(0.14f, 0.11f, 0.05f), mouthM);
-            Part(PrimitiveType.Sphere, bt, "Tongue", new Vector3(0f, 0.772f, 0.495f), new Vector3(0.085f, 0.05f, 0.035f), tongueM);
-            // Tiny arms + tiny legs on PIVOTS (BunnyBody swings them: arms up
-            // on jumps, legs stepping while she walks)
+            Part(PrimitiveType.Sphere, bt, "Nose", new Vector3(0f, 0.835f, 0.5f), new Vector3(0.07f, 0.05f, 0.04f), noseM);
+            Part(PrimitiveType.Sphere, bt, "Mouth", new Vector3(0f, 0.765f, 0.468f), new Vector3(0.1f, 0.065f, 0.04f), mouthM);
+            Part(PrimitiveType.Sphere, bt, "Tongue", new Vector3(0f, 0.748f, 0.483f), new Vector3(0.06f, 0.035f, 0.03f), tongueM);
+            // Tiny caramel arms + cream legs on pivots (BunnyBody swings them)
             foreach (var side in new[] { -1f, 1f })
             {
                 string sfx = side < 0f ? "L" : "R";
                 var armPivot = new GameObject("ArmPivot" + sfx);
                 armPivot.transform.SetParent(bt, false);
-                armPivot.transform.localPosition = new Vector3(side * 0.4f, 0.44f, 0.03f);
+                armPivot.transform.localPosition = new Vector3(side * 0.31f, 0.46f, 0.05f);
                 armPivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 10f);
-                Part(PrimitiveType.Capsule, armPivot.transform, "Arm", new Vector3(0f, -0.11f, 0f), new Vector3(0.14f, 0.24f, 0.14f), pudding);
+                Part(PrimitiveType.Capsule, armPivot.transform, "Arm", new Vector3(0f, -0.11f, 0f), new Vector3(0.15f, 0.22f, 0.15f), caramelLight);
                 var legPivot = new GameObject("LegPivot" + sfx);
                 legPivot.transform.SetParent(bt, false);
-                legPivot.transform.localPosition = new Vector3(side * 0.17f, 0.18f, 0.02f);
+                legPivot.transform.localPosition = new Vector3(side * 0.17f, 0.17f, 0.02f);
                 Part(PrimitiveType.Sphere, legPivot.transform, "Leg", new Vector3(0f, -0.05f, 0.01f), new Vector3(0.17f, 0.16f, 0.17f), pudding);
-                Part(PrimitiveType.Sphere, legPivot.transform, "Foot", new Vector3(0f, -0.115f, 0.07f), new Vector3(0.19f, 0.1f, 0.3f), pudding);
+                Part(PrimitiveType.Sphere, legPivot.transform, "Foot", new Vector3(0f, -0.11f, 0.07f), new Vector3(0.2f, 0.1f, 0.3f), pudding);
             }
-            // Small cream tail puff - the behind-camera sees it constantly
-            Part(PrimitiveType.Sphere, bt, "Tail", new Vector3(0f, 0.3f, -0.36f), new Vector3(0.22f, 0.22f, 0.22f), pudding);
+            // Cream tail puff
+            Part(PrimitiveType.Sphere, bt, "Tail", new Vector3(0f, 0.3f, -0.29f), new Vector3(0.2f, 0.2f, 0.2f), pudding);
             return player;
         }
         /// <summary>
@@ -872,14 +989,15 @@ namespace Crunchee.EditorTools
 
         /// <summary>Load a generated texture asset, creating it (PNG in Assets/Textures) on first build.</summary>
         /// <summary>
-        /// The dreamy room (Faith, Nov 3): a cake-tier TOWER at the center of
+        /// Room dressing (Nov 6, straight hall): finish cake, clouds beside the
+        /// climb, twinkle dust and floor props. Older notes: a cake-tier TOWER at the center of
         /// the spiral with a glowing star on top, clouds floating around the
         /// stairs, a spiral strand of glowing orbs following the climb,
         /// twinkle dust drifting in the air, bakery props on the floor plate
         /// and on the clouds, and the finish cake crowning the top platform -
         /// the reference videos' soft pink world, rebuilt round.
         /// </summary>
-        static void BuildDreamyRoom(Vector3 center, Vector3 finishPos, float finishYaw)
+        static void BuildDreamyRoom(Vector3 finishPos, float finishYaw, float zMin, float zMax)
         {
             var cakeMats = new[]
             {
@@ -889,39 +1007,6 @@ namespace Crunchee.EditorTools
                 Mat("CakeChoco", new Color(0.55f, 0.36f, 0.24f), 1f, 0.6f),
             };
             var cherryMat = Mat("Cherry", new Color(0.9f, 0.15f, 0.25f), 1f, 0.9f);
-            var frostingWhite = Mat("RingFrosting", new Color(1f, 0.98f, 0.95f), 1f, 0.5f);
-
-            // --- Center tower: stacked cake tiers the staircase wraps ---
-            int tiers = Mathf.Max(3, Mathf.CeilToInt((finishPos.y - 0.2f) / 1.95f));
-            float y = -0.05f;
-            for (int i = 0; i < tiers; i++)
-            {
-                float tr = Mathf.Lerp(1.3f, 0.75f, i / Mathf.Max(1f, tiers - 1f)), th = i == 0 ? 2.1f : 1.9f;
-                var tier = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                tier.name = $"TowerTier{i + 1}";
-                tier.transform.position = center + new Vector3(0f, y + th / 2f, 0f);
-                tier.transform.localScale = new Vector3(tr * 2f, th / 2f, tr * 2f);
-                tier.GetComponent<MeshRenderer>().material = cakeMats[i % cakeMats.Length];
-                Object.DestroyImmediate(tier.GetComponent<Collider>());
-                var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                ring.name = "FrostingRing";
-                ring.transform.position = center + new Vector3(0f, y + th - 0.03f, 0f);
-                ring.transform.localScale = new Vector3((tr + 0.07f) * 2f, 0.06f, (tr + 0.07f) * 2f);
-                ring.GetComponent<MeshRenderer>().material = frostingWhite;
-                Object.DestroyImmediate(ring.GetComponent<Collider>());
-                y += th;
-            }
-            // Glowing star-sphere on top + one warm point light
-            var star = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            star.name = "TowerStar";
-            star.transform.position = center + new Vector3(0f, y + 0.5f, 0f);
-            star.transform.localScale = new Vector3(0.62f, 0.62f, 0.62f);
-            star.GetComponent<MeshRenderer>().material = EmissiveMat("TowerStar", new Color(1f, 0.85f, 0.45f), 2.2f);
-            Object.DestroyImmediate(star.GetComponent<Collider>());
-            var glow = new GameObject("TowerGlow").AddComponent<Light>();
-            glow.type = LightType.Point; glow.color = new Color(1f, 0.8f, 0.55f);
-            glow.intensity = 0.8f; glow.range = 13f;
-            glow.transform.position = center + new Vector3(0f, y + 0.55f, 0f);
 
             // --- The FINISH CAKE on the finish platform (from the big build) ---
             {
@@ -944,62 +1029,37 @@ namespace Crunchee.EditorTools
                 }
             }
 
-            // --- Clouds floating around the stairs (soft self-lit white: plain
-            // lit matte read grey-beige against the dreamy fog) ---
+            // --- Soft clouds drifting beside the climb ---
             var cloudMat = Mat("Cloud", new Color(0.99f, 0.98f, 1f), 1f, 0.22f);
             cloudMat.EnableKeyword("_EMISSION");
-            cloudMat.SetColor("_EmissionColor", new Color(0.55f, 0.52f, 0.58f));
-            var clouds = new (float ang, float r, float y, float s)[]
+            cloudMat.SetColor("_EmissionColor", new Color(0.4f, 0.37f, 0.42f));
+            for (int i = 0; i < 9; i++)
             {
-                (15f, 9.5f, 1.4f, 1.2f), (75f, 10.5f, 3.6f, 1.5f), (130f, 9.2f, 6.0f, 1.1f),
-                (195f, 10.8f, 2.4f, 1.4f), (250f, 9.4f, 7.4f, 1.2f), (305f, 11.0f, 4.8f, 1.6f),
-                (340f, 8.8f, 8.8f, 1.0f),
-            };
-            var cloudPos = new Vector3[clouds.Length];
-            for (int i = 0; i < clouds.Length; i++)
-            {
-                float a = clouds[i].ang * Mathf.Deg2Rad;
-                cloudPos[i] = center + new Vector3(Mathf.Cos(a) * clouds[i].r, clouds[i].y, Mathf.Sin(a) * clouds[i].r);
-                BuildCloud(cloudPos[i], clouds[i].s, cloudMat);
-            }
-            // Cupcakes resting on two of the clouds
-            BuildCupcake(cloudPos[1] + new Vector3(0.2f, 0.42f, 0.1f), cakeMats[0], cherryMat);
-            BuildCupcake(cloudPos[4] + new Vector3(-0.15f, 0.34f, 0f), cakeMats[1], cherryMat);
-
-            // --- Spiral strand of glowing orbs, following the climb ---
-            var orbMat = EmissiveMat("LightOrb", new Color(1f, 0.8f, 0.45f), 1.8f);
-            for (int i = 0; i <= 28; i++)
-            {
-                float deg = -90f + i * 11.25f;
-                float a = deg * Mathf.Deg2Rad;
-                float yy = 0.35f + ((deg + 90f) / SpiralStepDeg) * SpiralRise + 1.8f;
-                var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                orb.name = "LightOrb";
-                orb.transform.position = center + new Vector3(Mathf.Cos(a) * 6.7f, yy, Mathf.Sin(a) * 6.7f);
-                orb.transform.localScale = new Vector3(0.16f, 0.16f, 0.16f);
-                orb.GetComponent<MeshRenderer>().material = orbMat;
-                Object.DestroyImmediate(orb.GetComponent<Collider>());
+                float z = Mathf.Lerp(zMin + 6f, zMax - 4f, i / 8f);
+                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
+                var cp = new Vector3((i % 2 == 0 ? -1f : 1f) * Random.Range(4.8f, 6.6f), pathY - Random.Range(1.5f, 3f), z);
+                BuildCloud(cp, Random.Range(1f, 1.5f), cloudMat);
+                if (i % 3 == 1) BuildCupcake(cp + new Vector3(0.1f, 0.4f, 0f), cakeMats[i % 2], cherryMat);
             }
 
-            // --- Twinkle dust drifting through the room ---
+            // --- Twinkle dust drifting down the hall ---
             var dust = new GameObject("TwinkleDust").AddComponent<ParticleSystem>();
-            dust.transform.position = center + new Vector3(0f, 5f, 0f);
+            dust.transform.position = new Vector3(0f, finishPos.y * 0.5f + 2f, (zMin + zMax) / 2f);
             var dmain = dust.main;
             dmain.loop = true; dmain.playOnAwake = true; dmain.startLifetime = 6f;
-            dmain.startSpeed = 0.12f; dmain.startSize = 0.09f; dmain.maxParticles = 90;
-            dmain.startColor = new Color(1f, 0.93f, 0.75f, 0.55f);
-            var dem = dust.emission; dem.rateOverTime = 14f;
+            dmain.startSpeed = 0.12f; dmain.startSize = 0.08f; dmain.maxParticles = 120;
+            dmain.startColor = new Color(1f, 0.93f, 0.8f, 0.45f);
+            var dem = dust.emission; dem.rateOverTime = 18f;
             var dshape = dust.shape; dshape.shapeType = ParticleSystemShapeType.Box;
-            dshape.scale = new Vector3(17f, 11f, 17f);
-            var dustMat = SparkleParticleMat();
-            dust.GetComponent<ParticleSystemRenderer>().material = dustMat;
+            dshape.scale = new Vector3(HallHalfW * 1.8f, finishPos.y + 6f, zMax - zMin);
+            dust.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
 
-            // --- A few bakery props on the floor plate ---
-            BuildMacarons(center + new Vector3(7.2f, -0.05f, -2.5f));
-            BuildCupcake(center + new Vector3(-7.4f, -0.05f, -1.8f), cakeMats[0], cherryMat);
-            BuildHoneyJar(center + new Vector3(7.6f, -0.05f, 3.4f));
-            BuildBerryBowl(center + new Vector3(-6.9f, -0.05f, 3.8f));
-            BuildFlourBowl(center + new Vector3(-7.8f, -0.05f, 6.8f));
+            // --- A few bakery props on the floor near the start ---
+            BuildMacarons(new Vector3(5.6f, -0.2f, 1.5f));
+            BuildCupcake(new Vector3(-5.4f, -0.2f, 2.2f), cakeMats[0], cherryMat);
+            BuildHoneyJar(new Vector3(6.2f, -0.2f, 6f));
+            BuildBerryBowl(new Vector3(-6f, -0.2f, 7f));
+            BuildFlourBowl(new Vector3(-6.4f, -0.2f, 11f));
         }
 
         /// <summary>One soft cloud: a cluster of flattened matte puffs.</summary>

@@ -4,7 +4,7 @@ Read this first if you're picking up this project cold. Everything below is veri
 
 ## What it is
 - 3D ASMR squishy game in Unity 6 (6000.6.7f1), Built-in Render Pipeline (NOT URP), iOS target.
-- Map 1 "Bakery / Butter Path": one long spiral-staircase path of 10 wax-coated butter sticks around a center cake tower, inside a dreamy pink checkerboard room. Walk-based traversal: one landing per squishy, the wax cracks into uneven plates, the character slowly sinks in. Every step cracks more.
+- Map 1: one straight climb up +Z inside a pink checker candy hall (Nov 6, replaced the spiral). Stage 1 = the 10 wax butters, then a pink checkpoint pad, then Stage 2 = 10 candy squishies (`ButterPathBuilder.Candy.cs`). Slots come from `SlotPos/SlotYaw`. Walk-based traversal: one landing per squishy, the wax cracks into uneven plates, the character slowly sinks in. Every step cracks more.
 - Player: Pudding Bunny, a glossy jelly pudding bunny built procedurally in code (see below).
 
 ## Current state — verified working
@@ -23,14 +23,15 @@ Read this first if you're picking up this project cold. Everything below is veri
 
 ## Key scripts
 - `Assets/Scripts/Core/Squishy.cs` — crack/sink/spring behaviour, plate-gap crack texture drawing, step cracks.
-- `Assets/Scripts/Player/PlayerController.cs` — walk glue to squishy tops, jump, eased input (moveSpeed 3.6, turnSpeed 2.6, inputSmooth 4.5 — tuned after "too sensitive" feedback; don't retune casually), fall safety net (y < -5 respawns).
+- `Assets/Scripts/Player/PlayerController.cs` — walk glue to squishy tops, jump, eased input (moveSpeed 3.6, turnSpeed 12 since Nov 6 so she can spin freely, inputSmooth 4.5 — tuned after "too sensitive" feedback; don't retune casually), fall safety net (y < -5 respawns).
 - `Assets/Scripts/Player/BunnyBody.cs` — bunny animation springs: ears flop back on jump / overshoot forward on landing, arms raise in the air, legs swing when walking, body bob/sway, idle breathing.
-- `Assets/Scripts/Camera/ThirdPersonFollow.cs` — behind-the-bunny follow camera (yaw chases the bunny's facing).
+- `Assets/Scripts/Camera/ThirdPersonFollow.cs` — FIXED high view looking up the climb (Nov 6, owner: "the character can face any direction, but the surrounding and top view stays the same"). Follows position only, never her facing.
+- Squish dent: `Crunchee/Candy` shaders bend vertices under her feet when the material has `_DentAmount` = 1 (globals `_CruncheeDent`/`_CruncheeDentDepth` set by `PlayerController.UpdateDent`). Wax shells are Voronoi plate meshes (`VoronoiCells`/`PrismMesh`).
 - `Assets/Scripts/Game/FinishTrigger.cs` — its own file on purpose: a MonoBehaviour class must live in a file of the same name or Unity won't load it.
 - `Assets/Scripts/UI/ProgressHud.cs` — the 10 gold pips; counts `Squishy.Cracked`.
 
 ## Locked design decisions (owner's calls — don't relitigate)
-- The bunny must match the owner's reference image exactly: glossy translucent jelly pudding, HUGE round head, caramel helmet cap with forehead drips, very long wide lop ears with caramel over the top halves and NO pink inner ear, big glossy eyes, tiny pink nose, OPEN smile with tongue, caramel collar with drips, tiny arms/legs, cream tail. Gameplay view is her BACK. Current build (v9, in `BuildPuddingBunny`) is built to that spec.
+- The bunny must match the owner's reference image exactly: glossy translucent jelly pudding, HUGE round head, caramel helmet cap with forehead drips, very long wide lop ears with caramel over the top halves and NO pink inner ear, big glossy eyes, tiny pink nose, OPEN smile with tongue, caramel collar with drips, tiny arms/legs, cream tail. Current build is v10 (Nov 6, owner's caramel-glazed chibi reference image): golden-cream head, amber caramel crown with drips all round, glazed lop ears, caramel body with cream belly.
 - Characters are made of food/squishy material, glossy — never fur/plush. Roster of 4: Pudding Bunny (player), Tofu Cub, Peach Jelly Duck, Matcha Mochi Bear (other 3 not built yet).
 - Sound model: soft squish is the base; the wax CRACK is the star (louder than the squish). Landing = deep squish, then the crack a beat later (~0.07s).
 - 10 progress pips stay. There is deliberately NO finish celebration.

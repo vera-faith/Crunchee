@@ -12,17 +12,17 @@ namespace Crunchee.CameraRig
     public class CruncheePostFX : MonoBehaviour
     {
         public Shader shader;
-        [Range(0f, 2f)] public float threshold = 0.95f;
+        [Range(0f, 2f)] public float threshold = 1.05f;
         [Range(0f, 1f)] public float knee = 0.25f;
-        [Range(0f, 3f)] public float bloomIntensity = 0.5f;
+        [Range(0f, 3f)] public float bloomIntensity = 0.32f;
         public Color bloomTint = new Color(1f, 0.9f, 0.92f);
         [Range(2, 6)] public int iterations = 5;
-        public float exposure = 0.95f;
+        public float exposure = 0.9f;
         public float saturation = 1.05f;
         public float contrast = 1.06f;
         public Color lift = new Color(0.05f, 0.02f, 0.06f);
         public Color gain = new Color(1.02f, 0.99f, 0.97f);
-        [Range(0f, 2f)] public float vignette = 0.55f;
+        [Range(0f, 2f)] public float vignette = 0.7f;
 
         Material mat;
         readonly RenderTexture[] chain = new RenderTexture[8];

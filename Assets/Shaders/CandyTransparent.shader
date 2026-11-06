@@ -11,6 +11,7 @@ Shader "Crunchee/CandyTransparent"
         _RimPower ("Rim Power", Range(0.5,8)) = 2.5
         _RimStrength ("Rim Strength", Range(0,2)) = 0.5
         [HDR] _EmissionColor ("Emission", Color) = (0,0,0,0)
+        _DentAmount ("Squish Dent", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
     SubShader
@@ -20,7 +21,7 @@ Shader "Crunchee/CandyTransparent"
         Cull [_Cull]
         ZWrite Off
         CGPROGRAM
-        #pragma surface CandySurf Candy alpha:fade
+        #pragma surface CandySurf Candy alpha:fade vertex:CandyVert
         #pragma target 3.0
         #include "CandyLighting.cginc"
         ENDCG

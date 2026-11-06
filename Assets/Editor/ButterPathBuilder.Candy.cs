@@ -86,6 +86,7 @@ namespace Crunchee.EditorTools
                     bodyMat = Mat($"CakeSponge{n}", tint, 1f, 0.3f); break;
             }
 
+            bodyMat.SetFloat("_DentAmount", 1f);
             var body = ChildBox(group.transform, "Body", new Vector3(0f, StepTop - H / 2f, 0f), new Vector3(W, H, D), bodyMat, true);
             // Decorations are authored in metres around the body centre and
             // still squash with the body as she sinks in.

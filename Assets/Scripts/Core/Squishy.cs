@@ -56,9 +56,12 @@ namespace Crunchee.Core
         // dominated and the plates read as tangled straw. Darker + wider
         // shadow, thinner + deeper gold core, so plates read as plates.
         const int MaxCrackNodes = 180;
-        static readonly Color GapShadow = new Color(0.36f, 0.19f, 0.06f, 0.78f);
-        static readonly Color GapButter = new Color(0.97f, 0.75f, 0.29f, 0.95f);
-        static readonly Color GapEdge = new Color(1f, 1f, 1f, 0.85f);
+        // Nov 6 look: cracked wax reads as bright white stress fractures
+        // with a frosted halo and a faint shadowed lower edge - not brown
+        // gold seams.
+        static readonly Color GapShadow = new Color(0.55f, 0.42f, 0.26f, 0.42f);
+        static readonly Color GapButter = new Color(1f, 0.99f, 0.96f, 0.97f);
+        static readonly Color GapEdge = new Color(1f, 1f, 1f, 0.42f);
         readonly List<Vector2> crackNodes = new List<Vector2>();
         readonly HashSet<long> crackEdges = new HashSet<long>();
         int sparkleCounter;
@@ -67,6 +70,8 @@ namespace Crunchee.Core
         Vector3 trackPos; float trackTime = -10f;
 
         public bool Cracked => cracked;
+        /// <summary>Depth of the soft bowl under her feet right now (drives the shader dent).</summary>
+        public float DentDepth => (0.05f + profile.squishDepth * 0.28f) * Mathf.Clamp01(sink);
         public float TopY => col != null ? col.bounds.max.y : transform.position.y;
 
         void Awake()
@@ -112,23 +117,19 @@ namespace Crunchee.Core
 
         void Update()
         {
-            if (occupied)
+            // Soft jelly spring (Nov 6, "make them squish better"): she
+            // presses it down with a little give-and-settle wobble, and it
+            // springs back up with an overshoot when she leaves.
             {
-                // Slow sink-in: full depth over ~0.9 s, no bounce.
-                sink = Mathf.MoveTowards(sink, 1f, Time.deltaTime / 0.9f);
-                sinkVel = 0f;
-            }
-            else if (sink > 0f || Mathf.Abs(sinkVel) > 0.001f)
-            {
-                // Released: spring back slowly with a soft overshoot wobble.
-                float stiff = 22f, damp = 6.0f;
-                sinkVel += (-stiff * sink - damp * sinkVel) * Time.deltaTime;
+                float target = occupied ? 1f : 0f;
+                float stiff = occupied ? 14f : 22f, damp = occupied ? 4.2f : 6f;
+                sinkVel += (stiff * (target - sink) - damp * sinkVel) * Time.deltaTime;
                 sink += sinkVel * Time.deltaTime;
-                if (sink < 0.004f && Mathf.Abs(sinkVel) < 0.008f) { sink = 0f; sinkVel = 0f; }
+                if (!occupied && Mathf.Abs(sink) < 0.004f && Mathf.Abs(sinkVel) < 0.008f) { sink = 0f; sinkVel = 0f; }
             }
-            float s = Mathf.Clamp(sink, -0.12f, 1f);
-            float y = 1f - profile.squishDepth * s;
-            float xz = 1f + (1f - y) * 0.55f; // volume-ish bulge sideways as it sinks
+            float s = Mathf.Clamp(sink, -0.15f, 1.15f);
+            float y = 1f - profile.squishDepth * 0.5f * s;
+            float xz = 1f + (1f - y) * 0.6f; // volume-ish bulge sideways as it sinks
             transform.localScale = new Vector3(restScale.x * xz, restScale.y * y, restScale.z * xz);
 
             // The dent: a soft pressed-in shadow that FOLLOWS her across the
@@ -183,7 +184,8 @@ namespace Crunchee.Core
             {
                 cracked = true;
                 occupied = true;
-                sink = Mathf.Max(sink, 0.3f); // the initial give as weight lands
+                sink = Mathf.Max(sink, 0.12f);
+                sinkVel += 2.6f; // the quick initial give as her weight lands
                 CrackShell();
                 AddNetworkCrack(worldPos, 1.05f); // the big bold crack network under the landing
                 AsmrAudio.PlaySquish(baseMaterial, coating, transform.position,
@@ -316,25 +318,21 @@ namespace Crunchee.Core
             pts[1] = Vector2.Lerp(a, b, 0.33f) + nrm * Random.Range(-len * 0.05f, len * 0.05f);
             pts[2] = Vector2.Lerp(a, b, 0.66f) + nrm * Random.Range(-len * 0.05f, len * 0.05f);
             float w = Random.Range(0.8f, 1.2f); // every gap its own width
+            var sh = new Vector2(-1.2f, -1.2f);
             for (int s = 0; s < 3; s++)
             {
-                // Clean plate seams (playtest: thick jagged triple lines read as tangled straw).
-                DrawGapPass(pts[s], pts[s + 1], GapShadow, 3.2f * w);
-                DrawGapPass(pts[s], pts[s + 1], GapButter, 1.3f * w);
-                var off = new Vector2(1.4f, 1.4f);
-                DrawGapPass(pts[s] + off, pts[s + 1] + off, GapEdge, 0.8f);
+                DrawGapPass(pts[s] + sh, pts[s + 1] + sh, GapShadow, 1.1f * w); // faint shadowed lower edge
+                DrawGapPass(pts[s], pts[s + 1], GapEdge, 2.6f * w);             // frosted halo
+                DrawGapPass(pts[s], pts[s + 1], GapButter, 0.95f * w);          // crisp white fracture
             }
-            // A long border sometimes sprouts one short T-stub - real plates
-            // micro-crack off their edges. It grows FROM the border, so it
-            // never reads as a random mark.
-            if (len > 90f && Random.value < 0.15f)
+            // A long border sometimes sprouts one short hairline off its side.
+            if (len > 90f && Random.value < 0.18f)
             {
                 var mid = pts[1];
                 float side = Random.value < 0.5f ? -1f : 1f;
                 var tip = mid + nrm * side * Random.Range(13f, 19f);
-                var off = new Vector2(1.7f, 1.7f);
-                DrawGapPass(mid, tip, GapButter, 1.8f);
-                DrawGapPass(mid + off, tip + off, GapEdge, 0.9f);
+                DrawGapPass(mid, tip, GapEdge, 1.8f);
+                DrawGapPass(mid, tip, GapButter, 0.7f);
             }
         }
 
@@ -482,7 +480,7 @@ namespace Crunchee.Core
                 // Piece locals live under the (scaled) step, so convert the world-space
                 // crack offset into shell-local space.
                 var ls = coatingShell.transform.lossyScale;
-                Vector3 off = new Vector3(0.1f / Mathf.Max(0.01f, Mathf.Abs(ls.x)), -0.05f / Mathf.Max(0.01f, Mathf.Abs(ls.y)), 0.1f / Mathf.Max(0.01f, Mathf.Abs(ls.z)));
+                Vector3 off = new Vector3(0.06f / Mathf.Max(0.01f, Mathf.Abs(ls.x)), -0.03f / Mathf.Max(0.01f, Mathf.Abs(ls.y)), 0.06f / Mathf.Max(0.01f, Mathf.Abs(ls.z)));
                 for (int i = 0; i < shellPieces.Length; i++)
                 {
                     // Every piece flies radially OUT from the shell center
@@ -493,7 +491,7 @@ namespace Crunchee.Core
                     if (dir.sqrMagnitude < 0.0004f) dir = new Vector3(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f));
                     dir.Normalize();
                     pieceTargetPos[i] = home + new Vector3(dir.x * off.x, off.y, dir.z * off.z);
-                    pieceTargetRot[i] = pieceHomeRot[i] * Quaternion.Euler(dir.z * 16f, 0f, -dir.x * 16f);
+                    pieceTargetRot[i] = pieceHomeRot[i] * Quaternion.Euler(dir.z * 9f, 0f, -dir.x * 9f);
                 }
                 crackAnim = 0f;
                 SpawnShards();

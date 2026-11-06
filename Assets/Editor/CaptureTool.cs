@@ -35,38 +35,36 @@ namespace Crunchee.EditorTools
             var startRot = player.transform.rotation;
             Shot(cam, "00_start", cam.transform.position, cam.transform.rotation);
 
-            int[] picks = { 3, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18 };
+            var follow = cam.GetComponent<Crunchee.CameraRig.ThirdPersonFollow>();
+            Vector3 off = follow != null ? follow.viewOffset : new Vector3(0f, 4.6f, -4.8f);
+            Quaternion vrot = follow != null ? follow.ViewRotation : cam.transform.rotation;
+            int[] picks = { 0, 3, 9, 10, 11, 12, 13, 14, 15, 16, 19 };
             var done = new HashSet<int>();
             foreach (var i in picks)
             {
                 if (i < 0 || i >= steps.Count || !done.Add(i)) continue;
                 var s = steps[i];
-                var next = steps[Mathf.Min(i + 1, steps.Count - 1)];
                 var top = TopOf(s);
-                var dir = next.position - s.position; dir.y = 0f;
-                if (dir.sqrMagnitude < 0.01f) dir = s.forward;
-                dir.Normalize();
                 player.transform.position = top;
-                player.transform.rotation = Quaternion.LookRotation(dir);
-                var cpos = top - dir * 4.6f + Vector3.up * 2.6f;
-                var crot = Quaternion.LookRotation(top + dir * 1.8f + Vector3.up * 0.9f - cpos);
-                Shot(cam, $"{done.Count:00}_step{i + 1:00}_{s.name}", cpos, crot);
+                // She faces a different way in each shot: the view must not care.
+                player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
+                Shot(cam, $"{done.Count:00}_step{i + 1:00}_{s.name}", top + off, vrot);
             }
             player.transform.SetPositionAndRotation(startPos, startRot);
 
-            // Bunny close-up from behind and front
+            // Bunny close-ups: front 3/4, side, back
             var bp = startPos;
             Shot(cam, "90_bunny_back", bp + new Vector3(0f, 1.4f, -2.2f), Quaternion.LookRotation(new Vector3(0f, -0.5f, 2.2f)));
-            Shot(cam, "91_bunny_front", bp + new Vector3(0f, 1.2f, 2.0f), Quaternion.LookRotation(new Vector3(0f, -0.3f, -2.0f)));
+            Shot(cam, "91_bunny_front", bp + new Vector3(0.5f, 1.25f, 2.0f), Quaternion.LookRotation(new Vector3(-0.5f, -0.35f, -2.0f)));
+            Shot(cam, "92_bunny_side", bp + new Vector3(2.1f, 1.2f, 0.4f), Quaternion.LookRotation(new Vector3(-2.1f, -0.3f, -0.4f)));
 
-            // Wide overview
+            // Wide side overview of the climb
             var b = new Bounds(startPos, Vector3.one);
             foreach (var s in steps) b.Encapsulate(s.position);
-            var ov = b.center + new Vector3(-4f, 9f, -11.5f);
-            Shot(cam, "99_overview", ov, Quaternion.LookRotation(b.center - ov));
-            Shot(cam, "98_tower_view", startPos + new Vector3(0f, 2.2f, -3.5f), Quaternion.Euler(-12f, 20f, 0f));
+            var ov = b.center + new Vector3(-7.2f, 7f, -22f);
+            Shot(cam, "99_overview", ov, Quaternion.LookRotation(b.center + Vector3.up * 2f - ov));
             var fx = cam.GetComponent<Crunchee.CameraRig.CruncheePostFX>();
-            if (fx != null) { fx.enabled = false; Shot(cam, "97_nopost", startPos + new Vector3(0f, 2.2f, -3.5f), Quaternion.Euler(-12f, 20f, 0f)); fx.enabled = true; }
+            if (fx != null) { fx.enabled = false; Shot(cam, "97_nopost", cam.transform.position, cam.transform.rotation); fx.enabled = true; }
             Debug.Log("[Capture] done: " + Path.GetFullPath("Captures"));
         }
 

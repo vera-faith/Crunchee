@@ -17,7 +17,7 @@ namespace Crunchee.Player
         public float moveSpeed = 3.6f;
         public float jumpForce = 9f;
         public float gravity = -22f;
-        public float turnSpeed = 2.6f;   // rad/s cap on turning - a full about-face takes over a second, in a wide smooth arc
+        public float turnSpeed = 12f;    // rad/s: she spins to face wherever she walks (Nov 6) - the camera no longer follows her facing, so turning freely is safe
         public float inputSmooth = 4.5f; // the smoothed input chases the stick SLOWLY - long gentle acceleration + glide to a stop (Faith, Nov 3: "still too sensitive, has to be a lot smoother")
         public Transform cameraRig;
 
@@ -31,6 +31,11 @@ namespace Crunchee.Player
         float distOnSquishy;
         Vector3 lastPos;
         Vector3 spawnPos;
+        Transform model;
+        float dentNow;
+        Vector3 dentPos;
+        static readonly int DentId = Shader.PropertyToID("_CruncheeDent");
+        static readonly int DentDepthId = Shader.PropertyToID("_CruncheeDentDepth");
 
         void Awake()
         {
@@ -39,6 +44,7 @@ namespace Crunchee.Player
             squash = GetComponentInChildren<SquashAndStretch>();
             lastPos = transform.position;
             spawnPos = transform.position;
+            model = transform.Find("Model");
         }
 
         void Update()
@@ -83,6 +89,19 @@ namespace Crunchee.Player
             if (move.sqrMagnitude > 0.04f)
                 transform.forward = Vector3.RotateTowards(transform.forward, move.normalized, turnSpeed * Time.deltaTime, 0f);
             wasGrounded = cc.isGrounded;
+            UpdateDent();
+        }
+
+        /// <summary>The squishy surface presses in under her feet (Candy
+        /// shader vertex dent) and her model sinks into it by the same amount.</summary>
+        void UpdateDent()
+        {
+            float target = groundSquishy != null ? groundSquishy.DentDepth : 0f;
+            dentNow = Mathf.Lerp(dentNow, target, 1f - Mathf.Exp(-10f * Time.deltaTime));
+            if (groundSquishy != null) dentPos = transform.position;
+            Shader.SetGlobalVector(DentId, new Vector4(dentPos.x, dentPos.y, dentPos.z, 0.8f));
+            Shader.SetGlobalFloat(DentDepthId, dentNow);
+            if (model) model.localPosition = new Vector3(0f, -dentNow * 0.85f, 0f);
         }
 
         void ReleaseSquishy()
