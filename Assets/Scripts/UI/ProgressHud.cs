@@ -22,7 +22,10 @@ namespace Crunchee.UI
         void Start()
         {
             var list = new List<Squishy>(FindObjectsOfType<Squishy>());
-            list.Sort((a, b) => a.transform.position.z.CompareTo(b.transform.position.z));
+            // Course order, not world axis: the path is a spiral.
+            list.Sort((a, b) => a.pathOrder != b.pathOrder
+                ? a.pathOrder.CompareTo(b.pathOrder)
+                : string.CompareOrdinal(a.name, b.name));
             squishies = list.ToArray();
             Refresh();
         }

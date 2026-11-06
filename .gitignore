@@ -9,3 +9,5 @@
 *.sln
 *.user
 .DS_Store
+
+/Captures/

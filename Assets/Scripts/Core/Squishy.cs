@@ -42,6 +42,10 @@ namespace Crunchee.Core
         Quaternion[] pieceHomeRot, pieceTargetRot;
         readonly List<Shard> shards = new List<Shard>();
         static Material shardMat;
+        [Tooltip("Position along the course; drives the progress pips.")]
+        public int pathOrder;
+        [Tooltip("Shared material for flying wax chips (assigned by the builder so it ships in the build).")]
+        public Material shardMaterial;
         Texture2D crackTex;
         const int CrackW = 512, CrackH = 256;
         // Wax-plate gap inks: shadowed depth, the butter showing through the
@@ -223,8 +227,8 @@ namespace Crunchee.Core
         {
             if (shardMat == null)
             {
-                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                shardMat = new Material(sh) { color = new Color(1f, 1f, 1f, 0.92f) };
+                shardMat = shardMaterial != null ? shardMaterial
+                    : new Material(Shader.Find("Crunchee/Candy")) { color = new Color(1f, 1f, 1f, 0.92f) };
             }
             int count = 3 + (waxLayers >= 5 ? 1 : 0);
             for (int i = 0; i < count; i++)
@@ -498,8 +502,8 @@ namespace Crunchee.Core
         {
             if (shardMat == null)
             {
-                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                shardMat = new Material(sh) { color = new Color(1f, 1f, 1f, 0.92f) };
+                shardMat = shardMaterial != null ? shardMaterial
+                    : new Material(Shader.Find("Crunchee/Candy")) { color = new Color(1f, 1f, 1f, 0.92f) };
             }
             int count = coating == Coating.Wax ? 5 + waxLayers : 8;
             for (int i = 0; i < count; i++)

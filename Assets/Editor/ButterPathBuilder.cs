@@ -25,7 +25,7 @@ namespace Crunchee.EditorTools
     /// coating cracks -> the character slowly sinks in, and cracks keep
     /// spreading + crackling underfoot wherever she walks on the butter.
     /// </summary>
-    public static class ButterPathBuilder
+    public static partial class ButterPathBuilder
     {
         // Mockup proportions: a butter bar is LONG across the path (~2.6x its depth).
         const float ButterW = 4.4f, ButterH = 0.62f, ButterD = 1.7f, PatH = 0.14f;
@@ -35,36 +35,16 @@ namespace Crunchee.EditorTools
 
         static Material Mat(string name, Color c, float alpha = 1f, float smoothness = 0.35f)
         {
-            var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            // Crunchee candy shaders: soft wrap light, glossy highlight and a
+            // rim glow - desserts read glazed and squishy, not flat plastic.
+            var sh = Shader.Find(alpha < 1f ? "Crunchee/CandyTransparent" : "Crunchee/Candy");
             var m = new Material(sh) { name = name, color = new Color(c.r, c.g, c.b, alpha) };
-            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smoothness);
-            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
-            if (alpha < 1f)
-            {
-                m.renderQueue = 3000;
-                if (m.HasProperty("_Surface"))
-                {
-                    // URP Lit: transparent surface
-                    m.SetFloat("_Surface", 1f);
-                    m.SetFloat("_Blend", 0f);
-                    m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                }
-                else if (m.HasProperty("_Mode"))
-                {
-                    // Built-in Standard shader (this project): Fade/Transparent
-                    // mode must be configured explicitly or the material renders
-                    // OPAQUE despite its alpha (the black-decal bug, Nov 2).
-                    m.SetFloat("_Mode", 3f); // Transparent
-                    m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    m.SetInt("_ZWrite", 0);
-                    m.DisableKeyword("_ALPHATEST_ON");
-                    m.EnableKeyword("_ALPHABLEND_ON");
-                    m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                }
-            }
+            m.SetFloat("_Glossiness", smoothness);
+            if (alpha < 1f) m.renderQueue = 3000;
             return m;
         }
+
+        static int pathCounter;
 
         static Material EmissiveMat(string name, Color c, float intensity)
         {
@@ -79,19 +59,15 @@ namespace Crunchee.EditorTools
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             Random.InitState(11); // stable prop scatter across rebuilds
+            pathCounter = 0;
+            ResetWorldCaches();
 
             // --- Atmosphere: dreamy lavender-pink (the reference videos'
             // room) + soft distance fog. Exposure reined in vs the big build:
             // build 1 blew out on the phone (sun 1.35, reflections 1.15), so
             // both come down and the ambient lifts slightly instead. ---
             var bg = new Color(0.93f, 0.85f, 0.94f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = bg;
-            RenderSettings.fogStartDistance = 42f;
-            RenderSettings.fogEndDistance = 120f;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.54f, 0.5f, 0.52f);
+            SetupSunsetSky();
             RenderSettings.reflectionIntensity = 0.85f;
 
             // --- Render quality (big build): MSAA, crisp shadows, full aniso ---
@@ -102,13 +78,14 @@ namespace Crunchee.EditorTools
 
             // --- Lighting: warm golden bakery sun, gentler than the big build ---
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.12f;
-            sun.color = new Color(1f, 0.88f, 0.7f);
+            sun.type = LightType.Directional; sun.intensity = 1.0f;
+            sun.color = new Color(1f, 0.84f, 0.7f);
             sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.8f;
             sun.shadowBias = 0.02f;
             sun.shadowNormalBias = 0.04f;
+            AddFillLight();
 
             // --- The room (Faith, Nov 3): the path is now a SPIRAL STAIRCASE
             // winding up a center tower inside a round, dreamy checkered room
@@ -120,25 +97,16 @@ namespace Crunchee.EditorTools
             floor.name = "RoomFloor";
             floor.transform.position = center + new Vector3(0f, -0.21f, 0f);
             floor.transform.localScale = new Vector3(30f, 0.15f, 30f);
-            floor.GetComponent<MeshRenderer>().material = Mat("RoomFloor", new Color(0.98f, 0.9f, 0.85f), 1f, 0.45f);
+            floor.GetComponent<MeshRenderer>().material = CheckerFloorMat();
             Object.DestroyImmediate(floor.GetComponent<Collider>());
             floor.AddComponent<MeshCollider>(); // the floor MUST be solid - step off the path and you land on it. (Bug found Nov 3: the collider was destroyed with the props', and she fell 41,720 units into the void.)
 
-            // Checkered room wall: a cylinder seen from inside (culling off).
-            var wallMat = Mat("CheckerWall", Color.white, 1f, 0.35f);
-            wallMat.mainTexture = CheckerTexture();
-            wallMat.mainTextureScale = new Vector2(6f, 2f);
-            wallMat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            wall.name = "CheckerWall";
-            wall.transform.position = center + new Vector3(0f, 13f, 0f);
-            wall.transform.localScale = new Vector3(33f, 17f, 33f);
-            wall.GetComponent<MeshRenderer>().material = wallMat;
-            Object.DestroyImmediate(wall.GetComponent<Collider>());
+            // Glass tower + glowing pillars + sunset sky + floating candy (reference videos).
+            BuildSunsetTower(center);
 
-            var butterMat = Mat("Butter", new Color(1f, 0.9f, 0.5f), 1f, 0.75f);
+            var butterMat = Mat("Butter", new Color(1f, 0.88f, 0.6f), 1f, 0.75f);
             butterMat.mainTexture = ButterSwirlTexture();
-            var patMat = Mat("ButterPat", new Color(1f, 0.92f, 0.55f), 1f, 0.8f);
+            var patMat = Mat("ButterPat", new Color(1f, 0.9f, 0.64f), 1f, 0.8f);
             patMat.mainTexture = ButterSwirlTexture();
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
@@ -193,8 +161,12 @@ namespace Crunchee.EditorTools
             // the bunny and sees her back + where she's headed ---
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
             var cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.clearFlags = CameraClearFlags.Skybox;
             cam.backgroundColor = bg;
+            cam.allowHDR = true;
+            cam.allowMSAA = true;
+            cam.farClipPlane = 260f;
+            camGo.AddComponent<CruncheePostFX>().shader = Shader.Find("Hidden/Crunchee/PostFX");
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
@@ -282,6 +254,9 @@ namespace Crunchee.EditorTools
                     particleColor = Color.white; shellName = "WaxShell"; crackable = true; break;
             }
 
+            // Thin rim so translucent wax stays see-through at grazing camera angles.
+            if (shellMat.color.a < 1f) { shellMat.SetFloat("_RimStrength", 0.1f); shellMat.SetFloat("_SpecStrength", 0.9f); }
+
             // Shell group sits on the pat. Wax/polish = a grid of small
             // plates (they split apart on the first landing); sugar/honey = one soft piece.
             var shell = new GameObject(shellName);
@@ -323,6 +298,7 @@ namespace Crunchee.EditorTools
             {
                 var decalMat = Mat("CrackDecal", Color.white, 0.99f, 0.5f);
                 decalMat.renderQueue = 3002;
+                NoSheen(decalMat);
                 var decal = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 decal.name = "CrackDecal";
                 decal.transform.SetParent(step.transform, false);
@@ -341,6 +317,7 @@ namespace Crunchee.EditorTools
                 var dentMat = Mat("Dent", Color.white, 0.99f, 0.5f);
                 dentMat.mainTexture = DentTexture();
                 dentMat.renderQueue = 3001;
+                NoSheen(dentMat);
                 var dent = GameObject.CreatePrimitive(PrimitiveType.Plane);
                 dent.name = "DentDecal";
                 dent.transform.SetParent(step.transform, false);
@@ -363,7 +340,10 @@ namespace Crunchee.EditorTools
             var main = ps.main; main.startColor = particleColor; main.startSize = 0.09f;
             main.startSpeed = 2.2f; main.startLifetime = 0.7f; main.playOnAwake = false;
             var em = ps.emission; em.enabled = false;
+            ps.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat(false);
             sq.stepParticles = ps;
+            sq.pathOrder = ++pathCounter;
+            sq.shardMaterial = Mat("WaxChip", new Color(1f, 0.98f, 0.94f), 0.92f, 0.7f);
         }
 
         /// <summary>Primitive cube as a LOCAL child - no world-space parenting
@@ -377,6 +357,7 @@ namespace Crunchee.EditorTools
             go.transform.localScale = localScale;
             go.GetComponent<MeshRenderer>().material = m;
             if (!keepCollider) Object.DestroyImmediate(go.GetComponent<Collider>());
+            Roundify(go);
             return go;
         }
 
@@ -985,8 +966,7 @@ namespace Crunchee.EditorTools
             var dem = dust.emission; dem.rateOverTime = 14f;
             var dshape = dust.shape; dshape.shapeType = ParticleSystemShapeType.Box;
             dshape.scale = new Vector3(17f, 11f, 17f);
-            var dustMat = Mat("TwinkleDust", Color.white, 0.55f, 0.5f);
-            dustMat.mainTexture = SparkleTexture();
+            var dustMat = SparkleParticleMat();
             dust.GetComponent<ParticleSystemRenderer>().material = dustMat;
 
             // --- A few bakery props on the floor plate ---
@@ -1132,6 +1112,7 @@ namespace Crunchee.EditorTools
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name; go.transform.position = p; go.transform.localScale = scale;
             go.GetComponent<MeshRenderer>().material = m;
+            Roundify(go);
             return go;
         }
 
