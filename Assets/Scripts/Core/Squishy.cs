@@ -212,12 +212,14 @@ namespace Crunchee.Core
         /// popping off underfoot. The surface itself stays clean - Faith,
         /// Nov 6: "no crack web marks on the butters".
         /// </summary>
+        int walkedSteps; // steps taken since the shell cracked (drives crackle fade)
+
         public void OnStep(Vector3 worldPos)
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
             if (coating == Coating.Wax) SpawnStepChips(worldPos); // pieces keep breaking off underfoot
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
-                               coating == Coating.Wax ? waxLayers : 0);
+                               coating == Coating.Wax ? waxLayers : 0, walkedSteps++);
             if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(1);
         }
 
