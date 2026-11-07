@@ -59,7 +59,7 @@ namespace Crunchee.EditorTools
             // is what clipped the whole frame white.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.46f, 0.41f, 0.37f);
-            RenderSettings.ambientEquatorColor = new Color(0.45f, 0.37f, 0.33f);
+            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.42f, 0.35f); // lifts the camera-facing sides
             RenderSettings.ambientGroundColor = new Color(0.31f, 0.25f, 0.24f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
@@ -83,14 +83,16 @@ namespace Crunchee.EditorTools
 
         static void AddFillLight()
         {
-            // Warm fill from behind the camera, no shadows: lifts the faces
-            // the golden-hour sun doesn't reach without flattening them.
+            // Warm fill from behind the camera, no shadows, low elevation so
+            // it rakes the camera-facing sides (the sun is at the far end and
+            // leaves them dark otherwise). Strong enough to read as window
+            // bounce, still well under the key sun.
             var fill = new GameObject("SkyFill").AddComponent<Light>();
             fill.type = LightType.Directional;
-            fill.color = new Color(1f, 0.9f, 0.78f);
-            fill.intensity = 0.22f;
+            fill.color = new Color(1f, 0.88f, 0.7f);
+            fill.intensity = 0.45f;
             fill.shadows = LightShadows.None;
-            fill.transform.rotation = Quaternion.Euler(35f, 10f, 0f);
+            fill.transform.rotation = Quaternion.Euler(28f, 10f, 0f);
         }
 
         // ---------------------------------------------------------------- tower
