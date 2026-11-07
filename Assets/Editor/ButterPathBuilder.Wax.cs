@@ -150,10 +150,13 @@ namespace Crunchee.EditorTools
                     // Bottom ring tapers inward by coatT so the skirt hugs
                     // the butter like a coat instead of a floating glass box.
                     var km = WaxSkirtMesh(hx, hz, cornerR, patTop + coatT, trayTop + 0.015f, coatT);
+                    // The skirt gets a LIGHTER coat material: the full milky
+                    // alpha on the side walls veiled the butter into grey fog.
+                    var skirtMat = WaxCoatMaterial($"{shellMat.name}Skirt", (waxLayers - 1) / 9f * 0.4f);
                     km.name = $"{name}_WaxSkirt";
                     SaveMeshGroup(new List<Mesh> { km }, $"WaxSkirt_{name}");
                     skirt.AddComponent<MeshFilter>().sharedMesh = km;
-                    skirt.AddComponent<MeshRenderer>().sharedMaterial = shellMat;
+                    skirt.AddComponent<MeshRenderer>().sharedMaterial = skirtMat;
                 }
             }
             else
