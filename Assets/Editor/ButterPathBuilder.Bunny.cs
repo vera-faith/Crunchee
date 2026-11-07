@@ -29,11 +29,11 @@ namespace Crunchee.EditorTools
             cream.SetColor("_EmissionColor", new Color(0.06f, 0.04f, 0.02f)); // faint jelly glow so the face never goes grey
             cream.SetFloat("_RimStrength", 0.15f);
             cream.SetColor("_RimColor", new Color(1f, 0.9f, 0.75f));
-            var caramel = Mat("Caramel", new Color(0.74f, 0.43f, 0.15f), 1f, 1f); // deeper, less saturated amber
+            var caramel = Mat("Caramel", new Color(0.64f, 0.37f, 0.13f), 1f, 1f); // deep amber-brown caramel, not orange
             caramel.SetFloat("_SpecStrength", 1.8f);
             caramel.SetFloat("_RimStrength", 0.15f);
             caramel.SetColor("_RimColor", new Color(1f, 0.7f, 0.4f));
-            var honey = Mat("CaramelHoney", new Color(0.9f, 0.62f, 0.3f), 1f, 1f);
+            var honey = Mat("CaramelHoney", new Color(0.84f, 0.56f, 0.26f), 1f, 1f);
             honey.SetFloat("_SpecStrength", 1.6f);
             honey.SetFloat("_RimStrength", 0.15f);
             var eyeM = Mat("EyeDark", new Color(0.12f, 0.06f, 0.03f), 1f, 1f);
@@ -43,7 +43,7 @@ namespace Crunchee.EditorTools
             var blushM = Mat("Blush", new Color(1f, 0.55f, 0.62f), 0.6f, 0.4f);
             NoSheen(blushM);
             var noseM = Mat("Nose", new Color(0.95f, 0.5f, 0.58f), 1f, 0.8f);
-            var mouthM = Mat("Mouth", new Color(0.42f, 0.13f, 0.14f), 1f, 0.6f);
+            var mouthM = Mat("Mouth", new Color(0.35f, 0.12f, 0.1f), 1f, 0.6f); // dark cocoa open smile, not red lips
             var tongueM = Mat("Tongue", new Color(1f, 0.56f, 0.62f), 1f, 0.7f);
 
             var player = new GameObject("Player_PuddingBunny") { tag = "Player" }; // FinishTrigger/Checkpoint find her by this tag
@@ -85,8 +85,11 @@ namespace Crunchee.EditorTools
                 float ang = Mathf.Atan2(p.x, p.z - headC.z);
                 float front = Mathf.Clamp01((Mathf.Cos(ang) - 0.35f) / 0.65f); // 1 = right over the eyes
                 float edgeY = Mathf.Lerp(1.30f, 1.14f, front) + 0.05f * Mathf.Sin(ang * 4f + 1.3f);
-                float shell = Mathf.Abs(SdfMesher.Ellipsoid(p, headC, headR) - 0.02f) - 0.013f;
-                float f = SdfMesher.Smax(shell, edgeY - p.y, 0.05f); // rounded lip at the pour edge
+                // SOLID caramel cap (not a thin shell - shells pinholed on the
+                // grid). The head surface inflated 0.03, cut at the wavy edge;
+                // the buried inner surface is invisible inside the cream.
+                float solid = SdfMesher.Ellipsoid(p, headC, headR) - 0.03f;
+                float f = SdfMesher.Smax(solid, edgeY - p.y, 0.05f); // rounded lip at the pour edge
                 for (int i = 0; i < 10; i++)
                 {
                     float a = i * (Mathf.PI * 2f / 10f) + 0.31f;
@@ -106,8 +109,8 @@ namespace Crunchee.EditorTools
             // running down from the neck.
             SdfMesher.Field bodyCaramelF = p =>
             {
-                float shell = Mathf.Abs(SdfMesher.Ellipsoid(p, bodyC, bodyR) - 0.02f) - 0.014f;
-                float f = shell;
+                // Solid glazed body: the body ellipsoid inflated 0.028.
+                float f = SdfMesher.Ellipsoid(p, bodyC, bodyR) - 0.028f;
                 foreach (var deg in new[] { 30f, 95f, 150f, 210f, 265f, 330f })
                 {
                     float a = deg * Mathf.Deg2Rad;
@@ -146,32 +149,32 @@ namespace Crunchee.EditorTools
                 pivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 8f);
                 var pt = pivot.transform;
 
-                var axis = new Vector3(side * 0.92f, -0.62f, 0.05f).normalized; // the droop direction
+                // Big wide lop ears (v12b): ~60 deg from vertical, sticking
+                // out to the sides and drooping, clearly two ears from the
+                // behind/above gameplay camera.
+                var axis = new Vector3(side * 1.05f, -0.6f, 0f).normalized;
                 var thin = (Vector3.forward - axis * Vector3.Dot(axis, Vector3.forward)).normalized;
                 var earRot = Quaternion.LookRotation(thin, axis); // local y -> ear axis, local z -> thickness
-                SdfMesher.Field earF = p =>
+                float EarSd(Vector3 p)
                 {
-                    float root = SdfMesher.Ellipsoid(p, axis * 0.10f, new Vector3(0.15f, 0.17f, 0.075f), earRot);
-                    float mid = SdfMesher.Ellipsoid(p, axis * 0.42f, new Vector3(0.23f, 0.22f, 0.085f), earRot);
-                    float tip = SdfMesher.Ellipsoid(p, axis * 0.70f, new Vector3(0.20f, 0.18f, 0.09f), earRot);
-                    return SdfMesher.Smin(SdfMesher.Smin(root, mid, 0.07f), tip, 0.07f);
-                };
+                    float root = SdfMesher.Ellipsoid(p, axis * 0.12f, new Vector3(0.17f, 0.20f, 0.08f), earRot);
+                    float mid = SdfMesher.Ellipsoid(p, axis * 0.50f, new Vector3(0.27f, 0.27f, 0.09f), earRot);
+                    float tip = SdfMesher.Ellipsoid(p, axis * 0.85f, new Vector3(0.22f, 0.21f, 0.10f), earRot);
+                    return SdfMesher.Smin(SdfMesher.Smin(root, mid, 0.08f), tip, 0.08f);
+                }
+                SdfMesher.Field earF = p => EarSd(p);
                 SdfMesher.Field earCoatF = p =>
                 {
-                    float ear = SdfMesher.Smin(SdfMesher.Smin(
-                        SdfMesher.Ellipsoid(p, axis * 0.10f, new Vector3(0.15f, 0.17f, 0.075f), earRot),
-                        SdfMesher.Ellipsoid(p, axis * 0.42f, new Vector3(0.23f, 0.22f, 0.085f), earRot), 0.07f),
-                        SdfMesher.Ellipsoid(p, axis * 0.70f, new Vector3(0.20f, 0.18f, 0.09f), earRot), 0.07f);
-                    float shell = Mathf.Abs(ear - 0.015f) - 0.011f;
-                    float along = Vector3.Dot(p, axis); // coat the half nearer the head
-                    float f = SdfMesher.Smax(shell, along - 0.44f, 0.04f);
-                    float drip = SdfMesher.Capsule(p, axis * 0.40f, axis * 0.55f, 0.05f);
+                    // Solid honey glaze over the half nearer the head + a drip.
+                    float along = Vector3.Dot(p, axis);
+                    float f = SdfMesher.Smax(EarSd(p) - 0.028f, along - 0.5f, 0.05f);
+                    float drip = SdfMesher.Capsule(p, axis * 0.45f, axis * 0.64f, 0.055f);
                     return SdfMesher.Smin(f, drip, 0.03f);
                 };
-                var em = SdfMesher.Build(earF, new Vector3(-0.25f, -0.75f, -0.3f), new Vector3(0.9f, 0.25f, 0.3f), 48);
+                var em = SdfMesher.Build(earF, new Vector3(-0.25f, -0.85f, -0.35f), new Vector3(1.15f, 0.3f, 0.35f), 48);
                 em.name = $"BunnyEar{sfx}";
-                var earGo = MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
-                var cm = SdfMesher.Build(earCoatF, new Vector3(-0.25f, -0.75f, -0.3f), new Vector3(0.9f, 0.25f, 0.3f), 40);
+                MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
+                var cm = SdfMesher.Build(earCoatF, new Vector3(-0.25f, -0.85f, -0.35f), new Vector3(1.15f, 0.3f, 0.35f), 40);
                 cm.name = $"BunnyEarCaramel{sfx}";
                 MeshPart(pt, "EarCaramel", SaveMesh(cm, $"BunnyEarCaramel{sfx}"), honey);
             }
@@ -186,6 +189,8 @@ namespace Crunchee.EditorTools
                 var s = SdfMesher.SurfacePoint(creamF, headC + d * 1.7f, -d, out var n);
                 var p = Part(PrimitiveType.Sphere, bt, name, s + n * outAmt, scale, m);
                 p.transform.localRotation = Quaternion.LookRotation(n);
+                // no shadow casting on face features - they streaked the cheeks
+                p.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
             foreach (var side in new[] { -1f, 1f })
             {
@@ -195,9 +200,9 @@ namespace Crunchee.EditorTools
                 Face("EyeShine2", new Vector3(side * 0.5f, -0.16f, 0.8f), new Vector3(0.035f, 0.035f, 0.02f), 0.065f, shineM);
                 Face("Blush", new Vector3(side * 0.75f, -0.30f, 0.6f), new Vector3(0.18f, 0.1f, 0.05f), 0.015f, blushM);
             }
-            Face("Nose", new Vector3(0f, -0.14f, 1f), new Vector3(0.075f, 0.055f, 0.045f), 0.02f, noseM);
-            Face("Mouth", new Vector3(0f, -0.26f, 1f), new Vector3(0.15f, 0.06f, 0.045f), 0.012f, mouthM);
-            Face("Tongue", new Vector3(0f, -0.28f, 1f), new Vector3(0.085f, 0.04f, 0.035f), 0.035f, tongueM);
+            Face("Nose", new Vector3(0f, -0.14f, 1f), new Vector3(0.07f, 0.05f, 0.04f), 0.018f, noseM);
+            Face("Mouth", new Vector3(0f, -0.24f, 1f), new Vector3(0.1f, 0.042f, 0.03f), 0.008f, mouthM);
+            Face("Tongue", new Vector3(0f, -0.265f, 1f), new Vector3(0.055f, 0.028f, 0.025f), 0.022f, tongueM);
 
             // ------------------------------------------------ limbs on the existing pivots
             // Tiny caramel arms with cream hands + cream legs/feet (BunnyBody
