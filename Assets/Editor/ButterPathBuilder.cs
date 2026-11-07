@@ -101,7 +101,7 @@ namespace Crunchee.EditorTools
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
             sun.shadowBias = 0.03f;
-            sun.shadowNormalBias = 0.5f; // curved surfaces (bunny, SDF) need the offset to not self-shadow-band; still tight enough to avoid peter-panning
+            sun.shadowNormalBias = 0.65f; // curved surfaces (bunny, SDF) need the offset to not self-shadow-band; still tight enough to avoid peter-panning
             AddFillLight();
 
             // --- The candy hall (Nov 6): one straight climb up +Z ---
@@ -205,7 +205,7 @@ namespace Crunchee.EditorTools
             PlayerSettings.productName = "Crunchee";
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, "com.verafaith.crunchee");
             PlayerSettings.bundleVersion = "1.0.0";
-            PlayerSettings.iOS.buildNumber = "2";
+            PlayerSettings.iOS.buildNumber = "3";
             PlayerSettings.iOS.appleDeveloperTeamID = "738KBBGF8K";
             PlayerSettings.iOS.appleEnableAutomaticSigning = true;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
