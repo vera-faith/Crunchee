@@ -222,7 +222,7 @@ namespace Crunchee.EditorTools
             {
                 float z = Mathf.Lerp(zMin + 8f, zMax - 6f, i / 3f);
                 float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
-                var cp = new Vector3((i % 2 == 0 ? -1f : 1f) * Random.Range(5.5f, 7f), pathY - Random.Range(2f, 3f), z);
+                var cp = new Vector3((i % 2 == 0 ? -1f : 1f) * Random.Range(5.5f, 7f), Mathf.Max(0.6f, pathY - Random.Range(0.8f, 1.5f)), z); // never below the floor
                 BuildCloud(cp, Random.Range(1f, 1.5f), cloudMat);
             }
 
@@ -370,7 +370,7 @@ namespace Crunchee.EditorTools
                 float y = -0.2f;
                 var at = new Vector3(x, y, z + Random.Range(-0.8f, 0.8f));
                 GameObject g;
-                switch (k % 9)
+                switch (k % 13)
                 {
                     case 0: g = BuildCroissant(at); break;
                     case 1: g = BuildCinnamonRoll(at); break;
@@ -380,6 +380,10 @@ namespace Crunchee.EditorTools
                     case 5: BuildFlourBowl(at); continue;
                     case 6: g = BuildCinnamonRoll(at); break;
                     case 7: BuildBerryBowl(at); continue;
+                    case 8: BuildBreadRolls(at); continue;
+                    case 9: BuildMilkBottles(at); continue;
+                    case 10: BuildJamJar(at); continue;
+                    case 11: BuildRollingPin(at); continue;
                     default: g = BuildCupcake(at, cakeMats[k % 3], cherryMat); break;
                 }
                 if (g != null && k % 4 == 0) LiftOnStand(g, at);
