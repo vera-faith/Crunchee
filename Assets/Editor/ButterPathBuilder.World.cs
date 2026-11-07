@@ -97,65 +97,6 @@ namespace Crunchee.EditorTools
 
         // ---------------------------------------------------------------- tower
 
-        /// <summary>
-        /// The candy hall (Nov 6): the course is one straight climb, so the
-        /// world is a long pink checker hall with glowing pillars, candy
-        /// floating beside the path and a soft dusk sky past the far end.
-        /// Everything stays low-contrast so the squishies are the focus.
-        /// </summary>
-        static void BuildCandyHall(float zMin, float zMax, float topY)
-        {
-            var root = new GameObject("CandyHall").transform;
-            float len = zMax - zMin, zc = (zMin + zMax) / 2f, wallH = topY + 9f;
-
-            var wallMat = Mat("HallWall", new Color(0.96f, 0.84f, 0.9f), 1f, 0.3f);
-            wallMat.mainTexture = CheckerTexture();
-            wallMat.mainTextureScale = new Vector2(len / 3f, wallH / 3f);
-            wallMat.SetFloat("_RimStrength", 0.04f);
-            wallMat.SetFloat("_SpecStrength", 0.25f);
-            var pillarMat = EmissiveMat("Pillar", new Color(1f, 0.95f, 0.97f), 0.85f);
-            var trimMat = EmissiveMat("PillarTrim", new Color(1f, 0.8f, 0.9f), 0.6f);
-            foreach (var side in new[] { -1f, 1f })
-            {
-                var wall = Box("HallWall", new Vector3(side * (HallHalfW + 0.15f), wallH / 2f - 0.3f, zc), new Vector3(0.3f, wallH, len), wallMat);
-                wall.transform.SetParent(root, true);
-                for (float z = zMin + 2f; z < zMax; z += 4.5f)
-                {
-                    var p = Box("Pillar", new Vector3(side * (HallHalfW - 0.1f), wallH / 2f - 0.3f, z), new Vector3(0.32f, wallH, 0.32f), pillarMat);
-                    p.transform.SetParent(root, true);
-                    Object.DestroyImmediate(p.GetComponent<Collider>());
-                }
-                foreach (float ty in new[] { 0.1f, topY * 0.5f, topY + 2f, wallH - 0.5f })
-                {
-                    var t = Box("PillarTrim", new Vector3(side * (HallHalfW - 0.05f), ty, zc), new Vector3(0.14f, 0.14f, len), trimMat);
-                    t.transform.SetParent(root, true);
-                    Object.DestroyImmediate(t.GetComponent<Collider>());
-                }
-            }
-
-            // Candy floating beside the path (never over it), rising with the climb.
-            int n = Mathf.RoundToInt(len / 2.1f);
-            for (int i = 0; i < n; i++)
-            {
-                float z = Mathf.Lerp(zMin + 3f, zMax - 2f, (i + Random.Range(0.1f, 0.9f)) / n);
-                float side = i % 2 == 0 ? -1f : 1f;
-                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
-                var pos = new Vector3(side * Random.Range(4.2f, 7f), pathY + Random.Range(-2.5f, 3.5f), z);
-                var prop = CandyProp(i % 7, pos, Random.Range(0.7f, 1.2f), root);
-                var bob = prop.gameObject.AddComponent<FloatBob>();
-                bob.amplitude = Random.Range(0.15f, 0.35f); bob.speed = Random.Range(0.4f, 0.8f);
-                bob.spin = Random.Range(-14f, 14f); bob.phase = Random.Range(0f, 6.28f);
-            }
-            // A few giant candies drifting in the sky past the far end.
-            for (int i = 0; i < 10; i++)
-            {
-                var pos = new Vector3(Random.Range(-18f, 18f), wallH + Random.Range(-4f, 12f), zMax + Random.Range(6f, 34f));
-                var prop = CandyProp(i % 7, pos, Random.Range(2.2f, 4f), root);
-                var bob = prop.gameObject.AddComponent<FloatBob>();
-                bob.amplitude = Random.Range(0.4f, 0.9f); bob.speed = Random.Range(0.2f, 0.4f);
-                bob.spin = Random.Range(-6f, 6f); bob.phase = Random.Range(0f, 6.28f);
-            }
-        }
 
         static Material CheckerFloorMat()
         {
