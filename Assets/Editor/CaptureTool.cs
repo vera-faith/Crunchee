@@ -19,6 +19,7 @@ namespace Crunchee.EditorTools
         // terminal) drops Temp/crunchee-capture.flag and the editor rebuilds
         // the scene + writes Captures/ on its next update tick.
         const string FlagPath = "Temp/crunchee-capture.flag";
+        const string ExportFlagPath = "Temp/crunchee-export-sounds.flag";
         static int poll;
 
         [InitializeOnLoadMethod]
@@ -32,7 +33,7 @@ namespace Crunchee.EditorTools
         static void Tick()
         {
             if (++poll % 45 != 0) return; // ~once a second, cheap
-            if (!File.Exists(FlagPath)) return;
+            if (!File.Exists(FlagPath) && !File.Exists(ExportFlagPath)) return;
             // Never clobber her Play session: wait until she exits Play mode.
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             AssetDatabase.Refresh();
@@ -40,9 +41,18 @@ namespace Crunchee.EditorTools
             // WatchFlag and the next tick retries - keep the flag until then so
             // stale code never builds.
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            File.Delete(FlagPath);
-            try { BuildAndCapture(); }
-            catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
+            if (File.Exists(ExportFlagPath))
+            {
+                File.Delete(ExportFlagPath);
+                try { SoundExport.Export(); }
+                catch (System.Exception e) { Debug.LogError("[Export] " + e); }
+            }
+            if (File.Exists(FlagPath))
+            {
+                File.Delete(FlagPath);
+                try { BuildAndCapture(); }
+                catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
+            }
         }
 
         [MenuItem("Crunchee/Capture Review Shots")]
