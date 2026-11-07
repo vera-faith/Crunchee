@@ -20,6 +20,7 @@ namespace Crunchee.EditorTools
         // the scene + writes Captures/ on its next update tick.
         const string FlagPath = "Temp/crunchee-capture.flag";
         const string ExportFlagPath = "Temp/crunchee-export-sounds.flag";
+        const string IosFlagPath = "Temp/crunchee-ios.flag";
         static int poll;
 
         [InitializeOnLoadMethod]
@@ -33,7 +34,7 @@ namespace Crunchee.EditorTools
         static void Tick()
         {
             if (++poll % 45 != 0) return; // ~once a second, cheap
-            if (!File.Exists(FlagPath) && !File.Exists(ExportFlagPath)) return;
+            if (!File.Exists(FlagPath) && !File.Exists(ExportFlagPath) && !File.Exists(IosFlagPath)) return;
             // Never clobber her Play session: wait until she exits Play mode.
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             AssetDatabase.Refresh();
@@ -46,6 +47,17 @@ namespace Crunchee.EditorTools
                 File.Delete(ExportFlagPath);
                 try { SoundExport.Export(); }
                 catch (System.Exception e) { Debug.LogError("[Export] " + e); }
+            }
+            if (File.Exists(IosFlagPath))
+            {
+                File.Delete(IosFlagPath);
+                try
+                {
+                    ButterPathBuilder.Build();
+                    ButterPathBuilder.BuildIOS();
+                    Debug.Log("[Crunchee] iOS build finished OK");
+                }
+                catch (System.Exception e) { Debug.LogError("[Crunchee] iOS build FAILED: " + e); }
             }
             if (File.Exists(FlagPath))
             {
