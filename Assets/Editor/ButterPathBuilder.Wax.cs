@@ -147,7 +147,9 @@ namespace Crunchee.EditorTools
                     skirt.transform.SetParent(step.transform, false);
                     skirt.transform.localPosition = Vector3.zero;
                     skirt.transform.localScale = new Vector3(1f / ButterW, 1f / ButterH, 1f / depth);
-                    var km = WaxSkirtMesh(hx, hz, cornerR, patTop + coatT, trayTop + 0.015f);
+                    // Bottom ring tapers inward by coatT so the skirt hugs
+                    // the butter like a coat instead of a floating glass box.
+                    var km = WaxSkirtMesh(hx, hz, cornerR, patTop + coatT, trayTop + 0.015f, coatT);
                     km.name = $"{name}_WaxSkirt";
                     SaveMeshGroup(new List<Mesh> { km }, $"WaxSkirt_{name}");
                     skirt.AddComponent<MeshFilter>().sharedMesh = km;
@@ -428,11 +430,13 @@ namespace Crunchee.EditorTools
 
         /// <summary>The clear side skirt of the wax coat: a single-walled
         /// rounded band from the slab's bottom edge down to just above the
-        /// tray, open at the bottom, smooth radial normals.</summary>
-        static Mesh WaxSkirtMesh(float hx, float hz, float r, float yTop, float yBottom)
+        /// tray, open at the bottom, smooth radial normals. bottomInset tucks
+        /// the bottom ring inward so the coat hugs the butter going down.</summary>
+        static Mesh WaxSkirtMesh(float hx, float hz, float r, float yTop, float yBottom, float bottomInset = 0f)
         {
             const int ArcSeg = 10;
             var outline = RoundedRectPoly(hx, hz, r, ArcSeg);
+            var outlineB = RoundedRectPoly(hx - bottomInset, hz - bottomInset, Mathf.Max(0.05f, r - bottomInset), ArcSeg);
             int n = outline.Count;
             var verts = new List<Vector3>(); var norms = new List<Vector3>();
             var uvs = new List<Vector2>(); var tris = new List<int>();
@@ -445,10 +449,11 @@ namespace Crunchee.EditorTools
             for (int i = 0; i < n; i++)
             {
                 var dir = new Vector3(outline[i].x, 0f, outline[i].y).normalized;
+                var dirB = new Vector3(outlineB[i].x, 0f, outlineB[i].y).normalized;
                 top[i] = verts.Count; verts.Add(new Vector3(outline[i].x, yTop, outline[i].y)); norms.Add(dir);
                 uvs.Add(new Vector2(outline[i].x * 0.3f + 0.5f, 0.5f));
-                bot[i] = verts.Count; verts.Add(new Vector3(outline[i].x, yBottom, outline[i].y)); norms.Add(dir);
-                uvs.Add(new Vector2(outline[i].x * 0.3f + 0.5f, 0.1f));
+                bot[i] = verts.Count; verts.Add(new Vector3(outlineB[i].x, yBottom, outlineB[i].y)); norms.Add(dirB);
+                uvs.Add(new Vector2(outlineB[i].x * 0.3f + 0.5f, 0.1f));
             }
             for (int i = 0; i < n; i++)
             {
