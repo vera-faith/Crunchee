@@ -24,15 +24,18 @@ namespace Crunchee.EditorTools
         {
             // Cream/golden jelly (the whole skin), deep amber caramel glaze,
             // lighter honey for the thin coats.
-            var cream = Mat("Cream", new Color(1f, 0.9f, 0.7f), 1f, 0.95f);
+            var cream = Mat("Cream", new Color(1f, 0.88f, 0.73f), 1f, 0.95f); // warm cream, not lemon
             cream.EnableKeyword("_EMISSION");
-            cream.SetColor("_EmissionColor", new Color(0.06f, 0.04f, 0.02f)); // faint jelly glow so the face never goes grey
+            cream.SetColor("_EmissionColor", new Color(0.05f, 0.035f, 0.02f)); // faint jelly glow so the face never goes grey
             cream.SetFloat("_RimStrength", 0.15f);
-            cream.SetColor("_RimColor", new Color(1f, 0.9f, 0.75f));
-            var caramel = Mat("Caramel", new Color(0.64f, 0.37f, 0.13f), 1f, 1f); // deep amber-brown caramel, not orange
-            caramel.SetFloat("_SpecStrength", 1.8f);
-            caramel.SetFloat("_RimStrength", 0.15f);
-            caramel.SetColor("_RimColor", new Color(1f, 0.7f, 0.4f));
+            cream.SetColor("_RimColor", new Color(1f, 0.88f, 0.72f));
+            // Deep toffee amber (it renders HOT - warm lights + rim emission +
+            // gain push it to orange; the base must be darker and cooler and
+            // the rim nearly gone so on-screen mids stay caramel-brown).
+            var caramel = Mat("Caramel", new Color(0.5f, 0.27f, 0.09f), 1f, 1f);
+            caramel.SetFloat("_SpecStrength", 1.6f);
+            caramel.SetFloat("_RimStrength", 0.06f);
+            caramel.SetColor("_RimColor", new Color(1f, 0.82f, 0.55f));
             var honey = Mat("CaramelHoney", new Color(0.84f, 0.56f, 0.26f), 1f, 1f);
             honey.SetFloat("_SpecStrength", 1.6f);
             honey.SetFloat("_RimStrength", 0.15f);
@@ -171,10 +174,14 @@ namespace Crunchee.EditorTools
                     float drip = SdfMesher.Capsule(p, axis * 0.45f, axis * 0.64f, 0.055f);
                     return SdfMesher.Smin(f, drip, 0.03f);
                 };
-                var em = SdfMesher.Build(earF, new Vector3(-0.25f, -0.85f, -0.35f), new Vector3(1.15f, 0.3f, 0.35f), 48);
+                // bounds must cover the OUTWARD direction per side - the
+                // left ear reaches -x, so a +x-only box clipped it to a nub.
+                var bmin = new Vector3(side > 0f ? -0.25f : -1.15f, -0.85f, -0.35f);
+                var bmax = new Vector3(side > 0f ? 1.15f : 0.25f, 0.3f, 0.35f);
+                var em = SdfMesher.Build(earF, bmin, bmax, 48);
                 em.name = $"BunnyEar{sfx}";
                 MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
-                var cm = SdfMesher.Build(earCoatF, new Vector3(-0.25f, -0.85f, -0.35f), new Vector3(1.15f, 0.3f, 0.35f), 40);
+                var cm = SdfMesher.Build(earCoatF, bmin, bmax, 40);
                 cm.name = $"BunnyEarCaramel{sfx}";
                 MeshPart(pt, "EarCaramel", SaveMesh(cm, $"BunnyEarCaramel{sfx}"), honey);
             }
