@@ -182,44 +182,69 @@ namespace Crunchee.Audio
                 env *= env;
                 lp += foam * (Noise(r) - lp);
                 lp2 += 0.35f * (Noise(r) - lp2);
+                float n3 = Noise(r);
+                mlp = aML * mlp + (1f - aML) * n3;
+                mhp = aMH * mhp + (1f - aMH) * mlp;
+                // decaying jiggle: starts at a peak so the press lands hard,
+                // then 5-7 pulses ride the squelch down
+                float wob = wobHz > 0f
+                    ? (1f - wobAmp + wobAmp * Mathf.Sin(2f * Mathf.PI * wobHz * t + Mathf.PI * 0.5f)) * Mathf.Exp(-x * 1.6f)
+                    : 1f;
                 ph += 2 * Mathf.PI * Mathf.Lerp(f0, f0 * 0.4f, x) / SR;
+                // resonant gummy body: the "boing" of the jelly, pulsing with
+                // the jiggle and decaying slower than the squelch so it reads
+                ph2 += 2 * Mathf.PI * bodyHz / SR;
+                float body = bodyHz > 0f
+                    ? Mathf.Sin((float)ph2) * Mathf.Exp(-x * 4.5f) * (0.5f + 0.5f * wob) * bodyAmp
+                    : 0f;
                 float hissEnv = hiss * Mathf.Exp(-Mathf.Pow((x - 0.62f) * 5f, 2f)); // air release near the end
-                d[i] = (lp * 1.15f + (lp2 - lp) * squelchAmt + Mathf.Sin((float)ph) * thump
+                d[i] = (lp * lpGain + (lp2 - lp) * squelchAmt + Mathf.Sin((float)ph) * thump
+                        + (mlp - mhp) * midAmt * (0.45f + 0.55f * wob) + body
                         + lp2 * hissEnv * 0.5f) * env;
             }
             return d;
         }
 
-        /// <summary>Dense creamy soft squish (Butter, also Croissant/Donut/Toast variants).</summary>
+        /// <summary>Dense creamy gummy squish - a 560 Hz jiggle "boing" over
+        /// soft squelch (Butter, also Croissant/Donut/Toast variants).</summary>
         public static AudioClip ButterBase(int seed)
         {
             var r = new System.Random(seed * 7919 + 13);
-            return ToClip("Synth_Butter", SoftSquishBuf(r, 0.22f, 120f, 0.10f, 0.45f, 0.7f), 0.6f);
+            return ToClip("Synth_Butter",
+                SoftSquishBuf(r, 0.26f, 130f, 0.06f, 0.45f, 0.05f, 0f, 23f, 0.45f, 0.7f,
+                              280f, 1150f, 560f, 1.6f), 0.6f);
         }
 
-        /// <summary>Airy foam press with a soft air-hiss release (CakeSponge).</summary>
+        /// <summary>Airy foam press, brighter gummy ring, soft air-hiss release
+        /// (CakeSponge).</summary>
         static AudioClip SpongeBase(int seed)
         {
             var r = new System.Random(seed * 3919 + 17);
-            return ToClip("Synth_Sponge", SoftSquishBuf(r, 0.3f, 170f, 0.16f, 0.65f, 0.35f, 1f), 0.55f);
+            return ToClip("Synth_Sponge",
+                SoftSquishBuf(r, 0.3f, 170f, 0.14f, 0.6f, 0.04f, 1f, 21f, 0.3f, 0.55f,
+                              280f, 1150f, 700f, 1.2f), 0.55f);
         }
 
-        /// <summary>Wet slick squelch with a bubble (Jam/Grape/Melon).</summary>
+        /// <summary>Wet gummy squelch with the strongest jiggle and a bubble
+        /// (Jam/Grape/Melon - the BlossomJelly squishies).</summary>
         static AudioClip JamBase(int seed)
         {
             var r = new System.Random(seed * 2377 + 11);
-            var d = SoftSquishBuf(r, 0.34f, 140f, 0.07f, 1.1f, 0.5f);
+            var d = SoftSquishBuf(r, 0.36f, 150f, 0.06f, 0.9f, 0.05f, 0f, 26f, 0.55f, 0.9f,
+                                  280f, 1150f, 640f, 1.7f);
             // one little bubble pop mid-squelch
             int st = (int)((0.1f + (float)r.NextDouble() * 0.12f) * SR);
             AddRing(d, st, 900 + (float)r.NextDouble() * 500f, 0.3f, 60f, 0.04f);
             return ToClip("Synth_Jam", d, 0.55f);
         }
 
-        /// <summary>Soft rubbery press, muted squeak, low thud (Mochi/PawPad).</summary>
+        /// <summary>Soft rubbery press, darker 480 Hz jiggle, muted squeak,
+        /// low thud (Mochi/PawPad - the Marshmallow squishies).</summary>
         static AudioClip MochiBase(int seed)
         {
             var r = new System.Random(seed * 1291 + 19);
-            var d = SoftSquishBuf(r, 0.28f, 100f, 0.06f, 0.3f, 0.8f);
+            var d = SoftSquishBuf(r, 0.3f, 105f, 0.05f, 0.3f, 0.1f, 0f, 20f, 0.4f, 0.5f,
+                                  280f, 1150f, 480f, 1.4f);
             // muted rubber squeak: short descending sine
             int st = (int)(0.04f * SR);
             double ph = 0;
@@ -333,12 +358,18 @@ namespace Crunchee.Audio
             return ToClip("Synth_NailPolish", d, 0.6f);
         }
 
-        /// <summary>The soft material squish for footsteps / soft re-lands.</summary>
+        /// <summary>The soft material squish for footsteps / soft re-lands.
+        /// Gummy mid-focus with a light jiggle - on unwaxed squishies this is
+        /// the whole sound, so it carries the chew.</summary>
         public static AudioClip SquishStep(int seed, bool deep = false)
         {
             var r = new System.Random(seed * 6151 + 29);
             return ToClip(deep ? "Synth_SquishDeep" : "Synth_SquishStep",
-                SoftSquishBuf(r, deep ? 0.3f : 0.17f, deep ? 118f : 148f, 0.10f, 0.5f, deep ? 0.7f : 0.5f),
+                SoftSquishBuf(r, deep ? 0.32f : 0.2f, deep ? 118f : 148f,
+                              deep ? 0.08f : 0.07f, 0.5f,
+                              deep ? 0.12f : 0.05f, 0f, deep ? 22f : 25f,
+                              deep ? 0.5f : 0.35f, deep ? 0.7f : 0.55f, 280f, 1150f,
+                              deep ? 560f : 620f, deep ? 1.3f : 1.1f),
                 deep ? 0.6f : 0.35f);
         }
 
