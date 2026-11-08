@@ -29,6 +29,7 @@ namespace Crunchee.Core
         public GameObject coatingShell;        // shell root; wax/polish hold crackable pieces as children
         [Tooltip("Smooth pre-crack glaze sheet; hidden the moment the plates appear so translucent seams never show.")]
         public GameObject seamlessShell;
+        public GameObject surfaceArtwork;
         public MeshRenderer dentDecal;         // soft shadow disc that follows her - the visible dent she sinks into
 
         SquishProfile profile;
@@ -41,6 +42,7 @@ namespace Crunchee.Core
         Transform[] shellPieces;
         Vector3[] pieceHomePos, pieceTargetPos;
         Quaternion[] pieceHomeRot, pieceTargetRot;
+        float[] piecePress;
         readonly List<Shard> shards = new List<Shard>();
         static Material shardMat;
         [Tooltip("Position along the course; drives the progress pips.")]
@@ -79,7 +81,7 @@ namespace Crunchee.Core
         void InitShellPieces()
         {
             if (shellPieces != null) return;
-            if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish || coating == Coating.Sugar))
+            if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish))
             {
                 int n = coatingShell.transform.childCount;
                 if (n > 0)
@@ -87,6 +89,7 @@ namespace Crunchee.Core
                     shellPieces = new Transform[n];
                     pieceHomePos = new Vector3[n]; pieceTargetPos = new Vector3[n];
                     pieceHomeRot = new Quaternion[n]; pieceTargetRot = new Quaternion[n];
+                    piecePress = new float[n];
                     for (int i = 0; i < n; i++)
                     {
                         var t = coatingShell.transform.GetChild(i);
@@ -157,14 +160,16 @@ namespace Crunchee.Core
             }
 
             // Shell-split animation
-            if (shellPieces != null && crackAnim < 1f && cracked)
+            if (shellPieces != null && cracked)
             {
-                crackAnim = Mathf.Min(1f, crackAnim + Time.deltaTime / 0.3f);
+                crackAnim = Mathf.Min(1f, crackAnim + Time.deltaTime / Mathf.Lerp(0.24f, 0.38f, (waxLayers - 1) / 9f));
                 float e = 1f - (1f - crackAnim) * (1f - crackAnim);
+                float localY = Mathf.Max(0.01f, Mathf.Abs(coatingShell.transform.lossyScale.y));
                 for (int i = 0; i < shellPieces.Length; i++)
                 {
-                    shellPieces[i].localPosition = Vector3.Lerp(pieceHomePos[i], pieceTargetPos[i], e);
-                    shellPieces[i].localRotation = Quaternion.Slerp(pieceHomeRot[i], pieceTargetRot[i], e);
+                    piecePress[i] = Mathf.MoveTowards(piecePress[i], 0f, Time.deltaTime * 3.8f);
+                    shellPieces[i].localPosition = Vector3.Lerp(pieceHomePos[i], pieceTargetPos[i], e) + Vector3.down * (piecePress[i] * 0.055f / localY);
+                    shellPieces[i].localRotation = Quaternion.Slerp(pieceHomeRot[i], pieceTargetRot[i], e) * Quaternion.Euler(0f, 0f, piecePress[i] * 3f);
                 }
             }
             for (int i = shards.Count - 1; i >= 0; i--)
@@ -191,8 +196,9 @@ namespace Crunchee.Core
                                      coating == Coating.Wax ? waxLayers : 1);
                 if (stepParticles != null)
                 {
-                    if (coating == Coating.Wax) stepParticles.Emit(6 + waxLayers * 4);
-                    else stepParticles.Emit(14);
+                    if (coating == Coating.Wax) stepParticles.Emit(10 + waxLayers * 5);
+                    else if (coating == Coating.Sugar) stepParticles.Emit(42);
+                    else stepParticles.Emit(10);
                 }
 #if UNITY_IOS || UNITY_ANDROID
                 Handheld.Vibrate(); // placeholder: graded haptics later (strength = profile.hapticStrength)
@@ -217,10 +223,23 @@ namespace Crunchee.Core
         public void OnStep(Vector3 worldPos)
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
-            if (coating == Coating.Wax) SpawnStepChips(worldPos); // pieces keep breaking off underfoot
+            if (coating == Coating.Wax) { SpawnStepChips(worldPos); FlexShellAt(worldPos); }
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
                                coating == Coating.Wax ? waxLayers : 0, walkedSteps++);
-            if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(1);
+            if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(2);
+            if (coating == Coating.Sugar && stepParticles != null) stepParticles.Emit(7);
+        }
+
+        void FlexShellAt(Vector3 worldPos)
+        {
+            if (shellPieces == null || piecePress == null) return;
+            for (int i = 0; i < shellPieces.Length; i++)
+            {
+                var p = shellPieces[i].position;
+                float d = Vector2.Distance(new Vector2(p.x, p.z), new Vector2(worldPos.x, worldPos.z));
+                float press = Mathf.Clamp01(1f - d / 1.15f) * (0.7f + waxLayers * 0.03f);
+                piecePress[i] = Mathf.Max(piecePress[i], press);
+            }
         }
 
         /// <summary>
@@ -242,7 +261,7 @@ namespace Crunchee.Core
                 Destroy(go.GetComponent<Collider>());
                 float sz = Random.Range(0.03f, 0.065f);
                 go.transform.localScale = new Vector3(sz, sz * 0.4f, sz);
-                go.transform.position = at + new Vector3(Random.Range(-0.16f, 0.16f), TopY + 0.03f, Random.Range(-0.16f, 0.16f));
+                go.transform.position = new Vector3(at.x + Random.Range(-0.16f, 0.16f), TopY + 0.04f, at.z + Random.Range(-0.16f, 0.16f));
                 shards.Add(new Shard
                 {
                     go = go,
@@ -266,6 +285,7 @@ namespace Crunchee.Core
         void CrackShell(Vector3 impact)
         {
             if (coatingShell == null) return;
+            if (surfaceArtwork != null && (coating == Coating.Wax || coating == Coating.NailPolish)) surfaceArtwork.SetActive(false);
             if (shellPieces != null && shellPieces.Length > 0)
             {
                 // Swap the smooth sheet for the real plates at the split,
@@ -299,25 +319,25 @@ namespace Crunchee.Core
                     // ~0.03 m gap minimum everywhere, blooming wider/deeper/
                     // harder-tilted near the landing - and chunkier the
                     // thicker the wax layer is.
-                    float sep = Mathf.Lerp(0.03f, 0.14f + waxLayers * 0.006f, near);
-                    float drop = Mathf.Lerp(0.02f, 0.05f + waxLayers * 0.005f, near);
-                    float tilt = Mathf.Lerp(4f, 12f + waxLayers, near);
+                    float sep = Mathf.Lerp(0.045f, 0.16f + waxLayers * 0.012f, near);
+                    float drop = Mathf.Lerp(0.025f, 0.06f + waxLayers * 0.008f, near);
+                    float tilt = Mathf.Lerp(5f, 16f + waxLayers * 1.2f, near);
                     pieceTargetPos[i] = home + new Vector3(dir.x * sep / Mathf.Max(0.01f, Mathf.Abs(ls.x)),
                                                             -drop / Mathf.Max(0.01f, Mathf.Abs(ls.y)),
                                                             dir.z * sep / Mathf.Max(0.01f, Mathf.Abs(ls.z)));
                     pieceTargetRot[i] = pieceHomeRot[i] * Quaternion.Euler(dir.z * tilt, 0f, -dir.x * tilt);
                 }
                 crackAnim = 0f;
-                SpawnShards();
+                SpawnShards(impact);
             }
             else if (coating == Coating.NailPolish)
             {
                 coatingShell.SetActive(false); // fallback: single-piece polish shell flashes off
-                SpawnShards();
+                SpawnShards(impact);
             }
         }
 
-        void SpawnShards()
+        void SpawnShards(Vector3 impact)
         {
             if (!Application.isPlaying) return; // edit-mode crack previews show plates only
             if (shardMat == null)
@@ -325,15 +345,15 @@ namespace Crunchee.Core
                 shardMat = shardMaterial != null ? shardMaterial
                     : new Material(Shader.Find("Crunchee/Candy")) { color = new Color(1f, 1f, 1f, 0.92f) };
             }
-            int count = coating == Coating.Wax ? 5 + waxLayers : 8;
+            int count = coating == Coating.Wax ? 8 + waxLayers * 2 : 8;
             for (int i = 0; i < count; i++)
             {
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.GetComponent<MeshRenderer>().material = shardMat;
                 Destroy(go.GetComponent<Collider>());
-                float sz = Random.Range(0.05f, 0.11f) * (coating == Coating.Wax ? (0.7f + waxLayers * 0.06f) : 1f);
-                go.transform.localScale = new Vector3(sz, sz * 0.4f, sz);
-                go.transform.position = transform.position + new Vector3(Random.Range(-0.9f, 0.9f), TopY + 0.05f, Random.Range(-0.6f, 0.6f));
+                float sz = Random.Range(0.05f, 0.12f) * (coating == Coating.Wax ? (0.75f + waxLayers * 0.07f) : 1f);
+                go.transform.localScale = new Vector3(sz * Random.Range(0.8f, 1.6f), sz * 0.32f, sz);
+                go.transform.position = new Vector3(impact.x + Random.Range(-0.48f, 0.48f), TopY + 0.06f, impact.z + Random.Range(-0.48f, 0.48f));
                 shards.Add(new Shard
                 {
                     go = go,

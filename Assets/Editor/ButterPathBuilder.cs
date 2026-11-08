@@ -28,13 +28,14 @@ namespace Crunchee.EditorTools
     /// </summary>
     public static partial class ButterPathBuilder
     {
-        // Mockup proportions: a butter bar is LONG across the path (~2.6x its depth).
-        const float ButterW = 4.4f, ButterH = 0.62f, ButterD = 1.7f, PatH = 0.14f;
+        // A recognisable wrapped butter STICK: tall yellow sides and a long top,
+        // rather than a thin yellow pat floating over a serving tray.
+        const float ButterW = 2.8f, ButterH = 0.9f, ButterD = 3f, PatH = 0f;
         const float StepAdvance = ButterD + 0.18f; // edges nearly touch: walk straight across
         // Straight climb (Nov 6, "match the view of the video"): every step is
         // one slot further along +Z and 0.55 higher, under a fixed camera.
         // Slot 10 is the checkpoint pad (it gets extra room on both sides).
-        const float StepDepth = 2.2f, PathAdvance = 2.3f, PathStartZ = 3.15f, PathRise = 0.55f, HallHalfW = 8f;
+        const float StepDepth = 3f, PathAdvance = 3.18f, PathStartZ = 3.15f, PathRise = 0.55f, HallHalfW = 8f;
         static float SlotZ(int i) => PathStartZ + i * PathAdvance + (i >= 10 ? 1f : 0f) + (i >= 11 ? 1f : 0f);
         static Vector3 SlotPos(int i) => new Vector3(i == 10 ? 0f : Mathf.Sin(i * 1.37f) * 0.6f, 0.35f + i * PathRise, SlotZ(i));
         static float SlotYaw(int i) => i == 10 ? 0f : Mathf.Sin(i * 0.83f + 0.6f) * 4f;
@@ -95,8 +96,8 @@ namespace Crunchee.EditorTools
             // like window light. Elevation 55 keeps a step's shadow to ~0.4 m
             // on the step below (the climb rises 0.55 per 2.3 m). ---
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.15f;
-            sun.color = new Color(1f, 0.88f, 0.72f);
+            sun.type = LightType.Directional; sun.intensity = 0.88f;
+            sun.color = new Color(1f, 0.9f, 0.78f);
             sun.transform.rotation = Quaternion.Euler(55f, 200f, 0f);
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
@@ -124,8 +125,8 @@ namespace Crunchee.EditorTools
             // Butter: soft pale-yellow blocks (Faith's reference image), squishy dent on.
             // _EnvStrength low: glossy butter that doesn't mirror the cloudy
             // sunset skybox (cloud reflections read as camo blotches, Nov 6).
-            var butterMat = ButterBodyMat("Butter", new Color(0.99f, 0.86f, 0.43f), 0.7f);
-            var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.92f, 0.55f), 0.75f);
+            var butterMat = ButterBodyMat("Butter", new Color(1f, 0.84f, 0.36f), 0.58f);
+            var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.88f, 0.44f), 0.62f);
             var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
 
@@ -186,8 +187,8 @@ namespace Crunchee.EditorTools
             var pfx = camGo.AddComponent<CruncheePostFX>();
             pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
             // Golden-hour grade: mostly-neutral, low bloom, gentle vignette.
-            pfx.exposure = 0.9f; pfx.threshold = 1.2f; pfx.bloomIntensity = 0.15f;
-            pfx.saturation = 1.08f; pfx.contrast = 1.1f; pfx.vignette = 0.3f;
+            pfx.exposure = 0.82f; pfx.threshold = 1.35f; pfx.bloomIntensity = 0.08f;
+            pfx.saturation = 1.12f; pfx.contrast = 1.08f; pfx.vignette = 0.24f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;

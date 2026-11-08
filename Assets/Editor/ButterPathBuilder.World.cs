@@ -64,8 +64,8 @@ namespace Crunchee.EditorTools
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.96f, 0.86f, 0.76f);
-            RenderSettings.fogStartDistance = 30f;
-            RenderSettings.fogEndDistance = 140f;
+            RenderSettings.fogStartDistance = 40f;
+            RenderSettings.fogEndDistance = 200f; // far walls must stay visible
 
             // Sky-only realtime probe so glossy candy picks up the sunset.
             var probeGo = new GameObject("SkyReflection");
@@ -90,7 +90,7 @@ namespace Crunchee.EditorTools
             var fill = new GameObject("SkyFill").AddComponent<Light>();
             fill.type = LightType.Directional;
             fill.color = new Color(1f, 0.88f, 0.7f);
-            fill.intensity = 0.45f;
+            fill.intensity = 0.3f;
             fill.shadows = LightShadows.None;
             fill.transform.rotation = Quaternion.Euler(28f, 10f, 0f);
         }
