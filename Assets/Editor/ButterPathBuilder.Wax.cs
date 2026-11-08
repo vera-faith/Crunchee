@@ -18,56 +18,48 @@ namespace Crunchee.EditorTools
         /// coordinates, so a step can sit at any angle (the spiral staircase).
         /// The Squishy and its decals stay parented under the body exactly as
         /// before, so all of their local-space math is unchanged.</summary>
-        static void BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default)
+        static GameObject BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default, bool wrapped = true)
         {
             if (depth <= 0f) depth = ButterD;
+            waxLayers = Mathf.Clamp(waxLayers, 1, 10);
             var group = new GameObject(name);
             group.transform.position = pos;
             group.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
 
             var step = ChildBox(group.transform, "Body", Vector3.zero, new Vector3(ButterW, ButterH, depth), butterMat, true);
-            Roundify(step, 0.2f); // soft, well-rounded butter block (reference image)
+            Roundify(step, 0.18f); // soft, well-rounded butter block (reference image)
 
-            // Soft white plastic serving tray under the block (reference
-            // image). Opaque and low-rim: the old clear tray glowed white.
-            var trayMat = Mat("Tray", new Color(0.96f, 0.95f, 0.93f), 1f, 0.6f);
-            trayMat.SetFloat("_RimStrength", 0.1f);
-            trayMat.SetFloat("_SpecStrength", 0.9f);
-            ChildBox(step.transform, "Tray",
-                     new Vector3(0f, (-ButterH / 2f - 0.03f) / ButterH, 0f),
-                     new Vector3((ButterW + 0.5f) / ButterW, 0.1f / ButterH, (depth + 0.42f) / depth),
-                     trayMat, false);
-
-            // Butter pat: the thinner slab on top of a real butter stick.
-            var pat = ChildBox(step.transform, "Pat",
-                     new Vector3(0f, (ButterH / 2f + PatH / 2f - 0.02f) / ButterH, 0f),
-                     new Vector3(0.96f, PatH / ButterH, 0.95f), patMat, false);
-            Roundify(pat, 0.07f);
+            if (PatH > 0f)
+            {
+                var pat = ChildBox(step.transform, "Pat",
+                         new Vector3(0f, (ButterH / 2f + PatH / 2f - 0.02f) / ButterH, 0f),
+                         new Vector3(0.96f, PatH / ButterH, 0.95f), patMat, false);
+                Roundify(pat, 0.07f);
+            }
 
             Material shellMat; Color particleColor; string shellName; bool crackable; float shellT;
             switch (coating)
             {
                 case Coating.Sugar:
-                    shellMat = Mat("SugarShell", new Color(1f, 0.93f, 0.95f), 0.88f, 0.9f);
-                    particleColor = new Color(1f, 0.8f, 0.88f); shellName = "SugarShell"; crackable = false; shellT = 0.12f; break;
+                    shellMat = Mat("SugarShell", new Color(1f, 0.96f, 0.98f), 0.2f, 0.9f);
+                    particleColor = new Color(1f, 0.94f, 0.98f); shellName = "SugarShell"; crackable = false; shellT = 0.035f; break;
                 case Coating.Honey:
                     shellMat = Mat("HoneyShell", new Color(1f, 0.62f, 0.12f), 0.5f, 1f);
                     particleColor = new Color(1f, 0.7f, 0.25f); shellName = "HoneyShell"; crackable = false; shellT = 0.12f; break;
                 case Coating.NailPolish:
                     shellMat = Mat("PolishShell", polishColor == default ? new Color(1f, 0.62f, 0.72f) : polishColor, 1f, 1f);
                     particleColor = shellMat.color; shellName = "PolishShell"; crackable = true; shellT = 0.08f; break;
-                default: // Wax: a clear glossy coat, thicker + milkier with every layer.
+                case Coating.Wax:
                     shellMat = WaxCoatMaterial($"Wax{waxLayers}", (waxLayers - 1) / 9f);
                     particleColor = Color.white; shellName = "WaxShell"; crackable = true; shellT = 0f; break;
+                default:
+                    shellMat = null; particleColor = new Color(1f, 0.9f, 0.55f);
+                    shellName = "NoCoating"; crackable = false; shellT = 0f; break;
             }
-            shellMat.SetFloat("_DentAmount", 1f);
+            if (shellMat != null) shellMat.SetFloat("_DentAmount", 1f);
 
-            // The wax coat (crackable coatings): a clear rounded clamshell
-            // that stands coatT OFF the butter on every side and is itself
-            // coatT thick, so no face is ever coplanar with butter, pat or
-            // tray. Layer n: coatT = 0.012 + 0.009*(n-1) m.
-            float coatT = 0.012f + 0.009f * (waxLayers - 1);
-            float patTop = ButterH / 2f + PatH - 0.02f; // world units above step centre
+            float coatT = coating == Coating.Wax ? 0.024f + 0.017f * (waxLayers - 1) : 0.02f;
+            float patTop = ButterH / 2f + PatH;
             float waxTop = crackable ? patTop + 2f * coatT : patTop + shellT;
 
             // Collider reaches the coat top so she stands ON the wax.
@@ -92,8 +84,8 @@ namespace Crunchee.EditorTools
                 // butter silhouette (corner radius = body round + the gap).
                 float hx = ButterW / 2f + 2f * coatT, hz = depth / 2f + 2f * coatT;
                 float cornerR = 0.2f + 2f * coatT;
-                int nx = coating == Coating.Wax ? 3 + (waxLayers + 1) / 3 : 3;
-                int nz = coating == Coating.Wax ? 3 : 2;
+                int nx = coating == Coating.Wax && waxLayers >= 7 ? 4 : 3;
+                int nz = 3;
                 var cells = VoronoiCells(hx * 2f, hz * 2f, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, 0f);
                 ClipToRoundedRect(cells, hx, hz, cornerR);
                 // Plates only appear post-crack now, so they can have a REAL
@@ -102,7 +94,7 @@ namespace Crunchee.EditorTools
                 // problem when the plates showed pre-crack.)
                 float plateBevel = Mathf.Min(0.04f, coatT * 0.5f + 0.004f);
                 crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", (waxLayers - 1) / 9f);
-                crackedShellMat.SetFloat("_Frost", 0.55f); // stress-whitened, contrasts the butter in the gaps
+                crackedShellMat.SetFloat("_Frost", 0.85f); // stress-whitened, contrasts the butter in the gaps
                 var meshes = new List<Mesh>();
                 for (int ci = 0; ci < cells.Count; ci++)
                 {
@@ -142,7 +134,7 @@ namespace Crunchee.EditorTools
                 // slab's outer bottom edge down to just above the tray top.
                 // Separate object - it does NOT swap out on crack.
                 {
-                    float trayTop = -ButterH / 2f + 0.02f;
+                    float trayTop = -ButterH / 2f + 0.015f;
                     var skirt = new GameObject("WaxSkirt");
                     skirt.transform.SetParent(step.transform, false);
                     skirt.transform.localPosition = Vector3.zero;
@@ -159,11 +151,37 @@ namespace Crunchee.EditorTools
                     skirt.AddComponent<MeshRenderer>().sharedMaterial = skirtMat;
                 }
             }
-            else
+            else if (coating != Coating.Plain)
             {
                 ChildBox(shell.transform, "Shell", new Vector3(0f, (shellT / 2f) / ButterH, 0f),
                          new Vector3(shellW / ButterW, shellT / ButterH, shellD / depth), shellMat, false);
             }
+
+            GameObject surfaceArtwork = null;
+            if (wrapped)
+            {
+                surfaceArtwork = new GameObject("WrapperArtwork");
+                surfaceArtwork.transform.SetParent(step.transform, false);
+                var paper = Mat("ButterWrapper", new Color(1f, 0.94f, 0.8f), 1f, 0.28f);
+                NoSheen(paper);
+                ChildBox(surfaceArtwork.transform, "PaperLabel",
+                         new Vector3(0f, (patTop + 0.006f) / ButterH, 0f),
+                         new Vector3(0.8f, 0.012f / ButterH, 0.64f), paper, false);
+                var print = new GameObject("ButterPrint");
+                print.transform.SetParent(surfaceArtwork.transform, false);
+                print.transform.localPosition = new Vector3(0f, (patTop + 0.014f) / ButterH, 0f);
+                print.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                print.transform.localScale = new Vector3(1f / ButterW, 1f / ButterH, 1f / depth);
+                var text = print.AddComponent<TextMesh>();
+                text.text = "BUTTER\nSALTED  •  4 OZ";
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.fontSize = 72; text.characterSize = 0.045f;
+                text.anchor = TextAnchor.MiddleCenter; text.alignment = TextAlignment.Center;
+                text.color = new Color(0.08f, 0.28f, 0.38f);
+                print.GetComponent<MeshRenderer>().sharedMaterial = WorldLabelMaterial(text.font);
+            }
+
+            if (coating == Coating.Sugar) AddSugarCrystals(shell.transform, patTop, shellT, depth);
             float shellTopLocal = waxTop / ButterH;
 
             // Dent decal: a soft shadow disc that follows the character on the
@@ -188,21 +206,56 @@ namespace Crunchee.EditorTools
 
             var sq = step.AddComponent<Squishy>();
             sq.baseMaterial = BaseMaterial.Butter; sq.coating = coating; sq.waxLayers = waxLayers;
-            sq.coatingShell = shell;
+            sq.coatingShell = coating == Coating.Plain ? null : shell;
             sq.seamlessShell = seamlessSheet;
+            sq.surfaceArtwork = surfaceArtwork;
             sq.crackedShellMaterial = crackedShellMat;
             sq.dentDecal = dentRend;
 
             var ps = new GameObject("StepParticles").AddComponent<ParticleSystem>();
             ps.transform.SetParent(step.transform, false);
-            ps.transform.localPosition = new Vector3(0f, ButterH * 0.6f, 0f);
-            var main = ps.main; main.startColor = particleColor; main.startSize = 0.09f;
-            main.startSpeed = 2.2f; main.startLifetime = 0.7f; main.playOnAwake = false;
+            ps.transform.localPosition = new Vector3(0f, (waxTop + 0.06f) / ButterH, 0f);
+            var main = ps.main;
+            main.startColor = particleColor;
+            main.startSize = coating == Coating.Sugar ? new ParticleSystem.MinMaxCurve(0.035f, 0.095f) : new ParticleSystem.MinMaxCurve(0.045f, 0.11f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.4f, 3.4f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.45f, 0.9f);
+            main.gravityModifier = 0.85f; main.maxParticles = 180; main.playOnAwake = false;
             var em = ps.emission; em.enabled = false;
-            ps.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat(false);
+            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(0.32f, 0.04f / ButterH, 0.32f);
+            ps.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat(coating == Coating.Sugar);
             sq.stepParticles = ps;
             sq.pathOrder = ++pathCounter;
             sq.shardMaterial = Mat("WaxChip", new Color(1f, 0.98f, 0.94f), 0.92f, 0.7f);
+            return group;
+        }
+
+        static void AddSugarCrystals(Transform shell, float patTop, float shellT, float depth)
+        {
+            var crystal = Mat("SugarCrystal", new Color(1f, 0.98f, 1f), 1f, 0.95f);
+            crystal.SetFloat("_SpecStrength", 1.8f);
+            for (int i = 0; i < 24; i++)
+            {
+                float size = Random.Range(0.025f, 0.065f);
+                var c = ChildBox(shell, "SugarCrystal",
+                    new Vector3(Random.Range(-ButterW * 0.43f, ButterW * 0.43f) / ButterW,
+                                (shellT + size * 0.5f) / ButterH,
+                                Random.Range(-depth * 0.43f, depth * 0.43f) / depth),
+                    new Vector3(size / ButterW, size / ButterH, size / depth), crystal, false);
+                c.transform.localRotation = Quaternion.Euler(Random.Range(-25f, 25f), Random.Range(0f, 180f), Random.Range(-25f, 25f));
+            }
+
+            var glitter = new GameObject("SugarGlitter").AddComponent<ParticleSystem>();
+            glitter.transform.SetParent(shell, false);
+            glitter.transform.localPosition = new Vector3(0f, (shellT + 0.06f) / ButterH, 0f);
+            var main = glitter.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.7f, 1.5f);
+            main.startSpeed = 0f; main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.07f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.8f, 0.92f, 0.8f), new Color(0.85f, 0.95f, 1f, 1f));
+            main.maxParticles = 60;
+            var emission = glitter.emission; emission.rateOverTime = 24f;
+            var shape = glitter.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(0.82f, 0.03f / ButterH, 0.82f);
+            glitter.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
         }
 
         /// <summary>Irregular convex plates covering a w x d rectangle: Voronoi
@@ -471,6 +524,14 @@ namespace Crunchee.EditorTools
             return m;
         }
 
+        static Material WorldLabelMaterial(Font font)
+        {
+            var m = new Material(Shader.Find("Crunchee/LabelText"));
+            m.mainTexture = font.material.mainTexture;
+            m.renderQueue = 2990;
+            return m;
+        }
+
         /// <summary>The clear wax coat material: thickness 0..1 drives the
         /// milky build - n=1 is nearly invisible glass, n=10 a thick
         /// translucent shell the yellow butter still reads through.</summary>
@@ -479,9 +540,9 @@ namespace Crunchee.EditorTools
             var m = new Material(Shader.Find("Crunchee/Wax")) { name = name };
             m.color = new Color(1f, 0.99f, 0.97f, 1f);
             m.SetFloat("_Thickness", thickness);
-            m.SetFloat("_Glossiness", 0.92f);
-            m.SetFloat("_SpecStrength", 2f);
-            m.SetFloat("_EnvStrength", 0.35f);
+            m.SetFloat("_Glossiness", 0.88f);
+            m.SetFloat("_SpecStrength", 1.45f);
+            m.SetFloat("_EnvStrength", 0.22f);
             m.renderQueue = 3000;
             return m;
         }
@@ -503,8 +564,17 @@ namespace Crunchee.EditorTools
         {
             if (meshes.Count == 0) return;
             string path = $"{GeneratedMeshDir}/{fileName}.asset";
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(meshes[0], path);
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null) AssetDatabase.CreateAsset(meshes[0], path);
+            else
+            {
+                EditorUtility.CopySerialized(meshes[0], existing);
+                existing.name = meshes[0].name;
+                foreach (var sub in AssetDatabase.LoadAllAssetsAtPath(path))
+                    if (sub != existing) Object.DestroyImmediate(sub, true);
+                meshes[0] = existing;
+                EditorUtility.SetDirty(existing);
+            }
             for (int i = 1; i < meshes.Count; i++) AssetDatabase.AddObjectToAsset(meshes[i], meshes[0]);
         }
 

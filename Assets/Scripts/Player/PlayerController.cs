@@ -72,13 +72,15 @@ namespace Crunchee.Player
             // Safety net: never fall forever. If she somehow leaves the
             // world, put her back at the start (Nov 3: the room floor had no
             // collider and she fell 41,720 units into the void).
-            if (transform.position.y < -5f)
+            if (transform.position.y < spawnPos.y - 8f)
             {
                 ReleaseSquishy();
                 velocity = Vector3.zero;
                 smoothInput = Vector2.zero;
                 cc.enabled = false;
                 transform.position = spawnPos;
+                lastPos = spawnPos;
+                wasGrounded = false;
                 cc.enabled = true;
             }
 
@@ -125,6 +127,7 @@ namespace Crunchee.Player
                 {
                     sq.SetOccupied(true);
                     sq.OnLanded(Mathf.Abs(velocity.y), transform.position);
+                    spawnPos = transform.position + Vector3.up * 0.65f;
                     if (!wasGrounded) squash?.OnLand();
                 }
             }

@@ -72,8 +72,8 @@ Shader "Crunchee/Wax"
             // fresnel edge boost is CAPPED so grazing angles turn glassy,
             // never opaque white, and there is NO rim emission (the haze).
             half rim = pow(1.0 - saturate(dot(normalize(IN.viewDir), o.Normal)), 3.0);
-            half base = lerp(0.05f, 0.38f, _Thickness) + _Frost * 0.3f;
-            o.Alpha = saturate((base + min(rim, 0.25f)) * c.a);
+            half base = lerp(0.07f, 0.52f, _Thickness) + _Frost * 0.32f;
+            o.Alpha = saturate((base + min(rim, 0.2f)) * c.a);
         }
         ENDCG
     }
