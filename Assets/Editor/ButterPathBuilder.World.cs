@@ -354,8 +354,7 @@ namespace Crunchee.EditorTools
                     for (int i = 0; i < w - 1; i++)
                     {
                         int a = baseIdx + j * w + i, b = a + 1, c = a + w, d2 = c + 1;
-                        if (f.sgn > 0) { tris.Add(a); tris.Add(c); tris.Add(b); tris.Add(b); tris.Add(c); tris.Add(d2); }
-                        else { tris.Add(a); tris.Add(b); tris.Add(c); tris.Add(b); tris.Add(d2); tris.Add(c); }
+                        tris.Add(a); tris.Add(c); tris.Add(b); tris.Add(b); tris.Add(c); tris.Add(d2);
                     }
             }
             var mesh = new Mesh();
