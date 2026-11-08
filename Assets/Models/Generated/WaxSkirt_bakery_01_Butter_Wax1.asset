@@ -6,7 +6,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: WaxSkirt_bakery_01_Butter_Wax1
+  m_Name: bakery_01_Butter_Wax1_WaxSkirt
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
