@@ -66,35 +66,54 @@ namespace Crunchee.EditorTools
         }
 
         [MenuItem("Crunchee/Build Butter Path Scene")]
-        public static void Build()
+        public static void Build() => BuildTheme(SquishyTheme.Bakery);
+
+        [MenuItem("Crunchee/Build Classic Butter Scene")]
+        public static void BuildClassicButter() => BuildTheme(SquishyTheme.ClassicButter);
+
+        [MenuItem("Crunchee/Build All Themes")]
+        public static void BuildAllThemes()
         {
+            Build();
+            BuildClassicButter();
+        }
+
+        public static void BuildTheme(SquishyTheme theme)
+        {
+            var definition = ThemePath.Get(theme);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             Random.InitState(11); // stable prop scatter across rebuilds
             pathCounter = 0;
             ResetWorldCaches();
 
-            // --- Atmosphere: dreamy lavender-pink (the reference videos'
-            // room) + soft distance fog. Exposure reined in vs the big build:
-            // build 1 blew out on the phone (sun 1.35, reflections 1.15), so
-            // both come down and the ambient lifts slightly instead. ---
-            var bg = new Color(0.93f, 0.85f, 0.94f);
+            var bg = definition.horizon;
             SetupSunsetSky();
+            RenderSettings.skybox.SetColor("_TopColor", definition.skyTop);
+            RenderSettings.skybox.SetColor("_MidColor", Color.Lerp(definition.skyTop, definition.horizon, 0.6f));
+            RenderSettings.skybox.SetColor("_HorizonColor", definition.horizon);
+            RenderSettings.skybox.SetColor("_CloudColor", Color.Lerp(definition.accent, Color.white, 0.55f));
+            string skyPath = $"Assets/Materials/{definition.id}Sky.mat";
+            var themeSky = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
+            if (themeSky == null)
+            {
+                themeSky = new Material(RenderSettings.skybox) { name = definition.id + "Sky" };
+                AssetDatabase.CreateAsset(themeSky, skyPath);
+            }
+            else EditorUtility.CopySerialized(RenderSettings.skybox, themeSky);
+            RenderSettings.skybox = themeSky;
+            RenderSettings.fogColor = Color.Lerp(definition.horizon, Color.white, 0.2f);
+            RenderSettings.fogStartDistance = 45f;
+            RenderSettings.fogEndDistance = 170f;
             RenderSettings.reflectionIntensity = 0.85f;
 
-            // --- Render quality (big build): MSAA, crisp shadows, full aniso ---
             QualitySettings.antiAliasing = 4;
-            QualitySettings.shadowDistance = 30f; // the camera is close - short range = dense shadow texels
+            QualitySettings.shadowDistance = 30f;
             QualitySettings.shadowCascades = 4;
-            QualitySettings.shadowCascade4Split = new Vector3(0.05f, 0.18f, 0.45f); // splits weighted near the camera
+            QualitySettings.shadowCascade4Split = new Vector3(0.05f, 0.18f, 0.45f);
             QualitySettings.shadowProjection = ShadowProjection.StableFit;
             QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
 
-            // --- Lighting: warm golden-hour bakery sun coming from the FAR
-            // end of the climb, high and slightly to the side - its specular
-            // glints rake across the glossy butter tops toward the camera
-            // like window light. Elevation 55 keeps a step's shadow to ~0.4 m
-            // on the step below (the climb rises 0.55 per 2.3 m). ---
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional; sun.intensity = 0.88f;
             sun.color = new Color(1f, 0.9f, 0.78f);
@@ -102,107 +121,81 @@ namespace Crunchee.EditorTools
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
             sun.shadowBias = 0.03f;
-            sun.shadowNormalBias = 0.65f; // curved surfaces (bunny, SDF) need the offset to not self-shadow-band; still tight enough to avoid peter-panning
+            sun.shadowNormalBias = 0.65f;
             AddFillLight();
 
-            // --- The candy hall (Nov 6): one straight climb up +Z ---
-            int slots = 10 + 1 + CandyPath().Length;
-            float zMin = -7f, zMax = SlotZ(slots) + 9f;
-            float topY = SlotPos(slots).y;
-
-            // Floor: long checker slab, solid (step off the path and you land on it).
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            floor.name = "RoomFloor";
-            floor.transform.position = new Vector3(0f, -0.3f, (zMin + zMax) / 2f);
-            floor.transform.localScale = new Vector3(HallHalfW * 2f, 0.2f, zMax - zMin);
-            var floorMat = CheckerFloorMat();
-            floorMat.mainTextureScale = new Vector2(HallHalfW * 2f / 3f, (zMax - zMin) / 3f);
-            floor.GetComponent<MeshRenderer>().material = floorMat;
-
-            BuildBakeryHall(zMin, zMax, topY);
-            BuildBakeryProps(zMin, zMax);
-
-            // Butter: soft pale-yellow blocks (Faith's reference image), squishy dent on.
-            // _EnvStrength low: glossy butter that doesn't mirror the cloudy
-            // sunset skybox (cloud reflections read as camo blotches, Nov 6).
             var butterMat = ButterBodyMat("Butter", new Color(1f, 0.84f, 0.36f), 0.58f);
             var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.88f, 0.44f), 0.62f);
-            var platformMat = Mat("Platform", new Color(0.98f, 0.94f, 0.86f), 1f, 0.5f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
-
-            // --- Start: a white FROSTING slab on a wooden board, sprinkles on
-            // top. Top stays at 0.49 so the first climb is unchanged. ---
             var board = Box("StartBoard", new Vector3(0f, 0.03f, 0f), new Vector3(4.7f, 0.12f, 4.7f), Mat("Board", new Color(0.85f, 0.62f, 0.44f), 1f, 0.45f));
             Object.DestroyImmediate(board.GetComponent<Collider>());
             Box("StartPlatform", new Vector3(0f, 0.29f, 0f), new Vector3(4f, 0.4f, 4f), frostingMat);
-            SprinkleTops(new Vector3(0f, 0.5f, 0f), 1.8f, 44);
+            if (theme == SquishyTheme.Bakery) SprinkleTops(new Vector3(0f, 0.5f, 0f), 1.8f, 44);
 
-            // --- Stage 1: the 10 wax butters ---
-            Vector3 lastPos = Vector3.zero;
-            int idx = 0;
-            foreach (var s in LevelPath.ButterPath())
+            var endless = new GameObject("EndlessSquishyPath").AddComponent<EndlessSquishyPath>();
+            endless.ahead = 25; endless.keepBehind = 5; endless.environmentFirstIndex = -1;
+            var templateRoot = new GameObject("StepTemplates").transform;
+            templateRoot.SetParent(endless.transform, false);
+            var definitions = definition.steps;
+            var templates = new GameObject[definitions.Length];
+            for (int i = 0; i < definitions.Length; i++)
             {
-                var p = SlotPos(idx);
-                BuildButter(p, $"Butter_{s.waxLayers:00}_Wax{s.waxLayers}", s.coating, s.waxLayers, butterMat, patMat, SlotYaw(idx), StepDepth);
-                lastPos = p; idx++;
+                var def = definitions[i];
+                string name = $"{definition.id}_{i:00}_{def.item}_{def.coating}{def.waxLayers}";
+                templates[i] = def.item == SquishyItem.Butter
+                    ? BuildButter(Vector3.zero, name, def.coating, def.waxLayers, butterMat, patMat, 0f, StepDepth, default, def.wrapped)
+                    : BuildBakeryItem(Vector3.zero, name, def.item, 0f);
+                templates[i].transform.SetParent(templateRoot, false);
             }
 
-            // --- Checkpoint pad, then Stage 2 (Candy Path) ---
-            BuildCheckpointPad(SlotPos(idx), SlotYaw(idx));
-            idx++;
-            int candyN = 0;
-            foreach (var def in CandyPath())
+            const int InitialSteps = 30;
+            var initial = new GameObject[InitialSteps];
+            for (int i = 0; i < InitialSteps; i++)
             {
-                var p = SlotPos(idx);
-                BuildCandyStep(p, ++candyN, def, SlotYaw(idx), StepDepth);
-                lastPos = p; idx++;
+                var template = templates[i % templates.Length];
+                var go = Object.Instantiate(template, EndlessSquishyPath.SlotPosition(i), EndlessSquishyPath.SlotRotation(i), endless.transform);
+                go.name = $"Step_{i:000}_{template.name}";
+                go.SetActive(true);
+                var sq = go.GetComponentInChildren<Squishy>();
+                if (sq != null) { sq.pathOrder = i + 1; sq.stage = 1; }
+                initial[i] = go;
             }
+            templateRoot.gameObject.SetActive(false);
+            endless.stepTemplates = templates;
+            endless.initialSteps = initial;
 
-            // --- Finish platform: one more rise past the last step ---
-            var finishPos = new Vector3(0f, lastPos.y + PathRise + 0.15f, lastPos.z + StepDepth / 2f + 0.1f + 2.1f);
-            float finishYaw = 0f;
-            var finish = Box("FinishPlatform", finishPos, new Vector3(4.2f, 0.4f, 4.2f), platformMat);
-            // The trigger is its own invisible zone ABOVE the solid platform,
-            // so she can stand on the platform AND trip the finish.
-            var zone = Box("FinishZone", finishPos + new Vector3(0f, 1.1f, 0f), new Vector3(4.2f, 2.2f, 4.2f), platformMat);
-            Object.DestroyImmediate(zone.GetComponent<MeshRenderer>());
-            zone.GetComponent<Collider>().isTrigger = true;
-            zone.AddComponent<FinishTrigger>();
-            BuildFinishDressing(finishPos, zMin, zMax);
+            var environment = new Transform[4];
+            for (int i = 0; i < environment.Length; i++) environment[i] = BuildThemeEnvironmentChunk(definition, i - 1);
+            endless.environmentChunks = environment;
 
-            // --- Player: Pudding Bunny ---
             var player = BuildPuddingBunny(new Vector3(0f, 1.0f, 0f));
             var pc = player.GetComponent<PlayerController>();
+            endless.player = player.transform;
 
-            // --- Camera: FIXED high view looking up the climb (Nov 6). It
-            // follows her position only - never her facing. ---
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
             var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.Skybox;
             cam.backgroundColor = bg;
             cam.allowHDR = true;
             cam.allowMSAA = true;
-            cam.farClipPlane = 260f;
+            cam.farClipPlane = 300f;
             cam.fieldOfView = 58f;
             var pfx = camGo.AddComponent<CruncheePostFX>();
             pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
-            // Golden-hour grade: mostly-neutral, low bloom, gentle vignette.
             pfx.exposure = 0.82f; pfx.threshold = 1.35f; pfx.bloomIntensity = 0.08f;
             pfx.saturation = 1.12f; pfx.contrast = 1.08f; pfx.vignette = 0.24f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
+            follow.viewOffset = new Vector3(0f, 7.4f, -8f);
+            follow.aimOffset = new Vector3(0f, 0.5f, 2.3f);
+            endless.cameraFollow = follow;
             camGo.transform.SetPositionAndRotation(follow.DesiredPosition, follow.ViewRotation);
             pc.cameraRig = camGo.transform;
 
-            // --- Audio root ---
             var audio = new GameObject("AsmrAudio"); audio.AddComponent<AsmrAudio>();
-
-            // --- UI ---
             BuildUI(player);
 
-            // --- iOS / App Store identity (set now so the TestFlight build is
-            // a straight export later) ---
             PlayerSettings.productName = "Crunchee";
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, "com.verafaith.crunchee");
             PlayerSettings.bundleVersion = "1.0.0";
@@ -217,8 +210,9 @@ namespace Crunchee.EditorTools
             SetAppIcon();
 
             if (!AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.CreateFolder("Assets", "Scenes");
-            EditorSceneManager.SaveScene(scene, "Assets/Scenes/ButterPath.unity");
-            Debug.Log("[Crunchee] Butter Path scene built: Assets/Scenes/ButterPath.unity — press Play.");
+            string scenePath = $"Assets/Scenes/{definition.sceneName}.unity";
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log($"[Crunchee] {definition.displayName} scene built: {scenePath} — press Play.");
         }
 
         /// <summary>Primitive cube as a LOCAL child - no world-space parenting

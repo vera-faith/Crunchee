@@ -18,7 +18,7 @@ namespace Crunchee.EditorTools
         /// coordinates, so a step can sit at any angle (the spiral staircase).
         /// The Squishy and its decals stay parented under the body exactly as
         /// before, so all of their local-space math is unchanged.</summary>
-        static void BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default, bool wrapped = true)
+        static GameObject BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default, bool wrapped = true)
         {
             if (depth <= 0f) depth = ButterD;
             waxLayers = Mathf.Clamp(waxLayers, 1, 10);
@@ -94,7 +94,7 @@ namespace Crunchee.EditorTools
                 // problem when the plates showed pre-crack.)
                 float plateBevel = Mathf.Min(0.04f, coatT * 0.5f + 0.004f);
                 crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", (waxLayers - 1) / 9f);
-                crackedShellMat.SetFloat("_Frost", 0.38f); // stress-whitened, contrasts the butter in the gaps
+                crackedShellMat.SetFloat("_Frost", 0.85f); // stress-whitened, contrasts the butter in the gaps
                 var meshes = new List<Mesh>();
                 for (int ci = 0; ci < cells.Count; ci++)
                 {
@@ -178,8 +178,7 @@ namespace Crunchee.EditorTools
                 text.fontSize = 72; text.characterSize = 0.045f;
                 text.anchor = TextAnchor.MiddleCenter; text.alignment = TextAlignment.Center;
                 text.color = new Color(0.08f, 0.28f, 0.38f);
-                print.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
-                print.GetComponent<MeshRenderer>().sharedMaterial.renderQueue = 2990;
+                print.GetComponent<MeshRenderer>().sharedMaterial = WorldLabelMaterial(text.font);
             }
 
             if (coating == Coating.Sugar) AddSugarCrystals(shell.transform, patTop, shellT, depth);
@@ -228,11 +227,12 @@ namespace Crunchee.EditorTools
             sq.stepParticles = ps;
             sq.pathOrder = ++pathCounter;
             sq.shardMaterial = Mat("WaxChip", new Color(1f, 0.98f, 0.94f), 0.92f, 0.7f);
+            return group;
         }
 
         static void AddSugarCrystals(Transform shell, float patTop, float shellT, float depth)
         {
-            var crystal = Mat("SugarCrystal", new Color(1f, 0.97f, 1f), 0.72f, 0.95f);
+            var crystal = Mat("SugarCrystal", new Color(1f, 0.98f, 1f), 1f, 0.95f);
             crystal.SetFloat("_SpecStrength", 1.8f);
             for (int i = 0; i < 24; i++)
             {
@@ -524,6 +524,14 @@ namespace Crunchee.EditorTools
             return m;
         }
 
+        static Material WorldLabelMaterial(Font font)
+        {
+            var m = new Material(Shader.Find("Crunchee/LabelText"));
+            m.mainTexture = font.material.mainTexture;
+            m.renderQueue = 2990;
+            return m;
+        }
+
         /// <summary>The clear wax coat material: thickness 0..1 drives the
         /// milky build - n=1 is nearly invisible glass, n=10 a thick
         /// translucent shell the yellow butter still reads through.</summary>
@@ -556,8 +564,17 @@ namespace Crunchee.EditorTools
         {
             if (meshes.Count == 0) return;
             string path = $"{GeneratedMeshDir}/{fileName}.asset";
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(meshes[0], path);
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null) AssetDatabase.CreateAsset(meshes[0], path);
+            else
+            {
+                EditorUtility.CopySerialized(meshes[0], existing);
+                existing.name = meshes[0].name;
+                foreach (var sub in AssetDatabase.LoadAllAssetsAtPath(path))
+                    if (sub != existing) Object.DestroyImmediate(sub, true);
+                meshes[0] = existing;
+                EditorUtility.SetDirty(existing);
+            }
             for (int i = 1; i < meshes.Count; i++) AssetDatabase.AddObjectToAsset(meshes[i], meshes[0]);
         }
 

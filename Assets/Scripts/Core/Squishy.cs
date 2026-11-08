@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Crunchee.Audio;
+using Crunchee.Game;
 
 namespace Crunchee.Core
 {
@@ -17,6 +18,7 @@ namespace Crunchee.Core
     {
         public BaseMaterial baseMaterial = BaseMaterial.Butter;
         public Coating coating = Coating.Plain;
+        public bool crackableCrust;
 
         [Tooltip("Wax layers (only used when coating = Wax). Butter Path uses 1..10 along the path: more layers = thicker/louder/longer crack, more flakes.")]
         [Range(1, 10)] public int waxLayers = 1;
@@ -81,7 +83,7 @@ namespace Crunchee.Core
         void InitShellPieces()
         {
             if (shellPieces != null) return;
-            if (coatingShell != null && (coating == Coating.Wax || coating == Coating.NailPolish))
+            if (coatingShell != null && (crackableCrust || coating == Coating.Wax || coating == Coating.NailPolish))
             {
                 int n = coatingShell.transform.childCount;
                 if (n > 0)
@@ -185,6 +187,7 @@ namespace Crunchee.Core
         /// <summary>First touch: crack + sound + particles, then the sink takes over.</summary>
         public void OnLanded(float impactSpeed, Vector3 worldPos)
         {
+            GetComponentInParent<EndlessSquishyPath>()?.Touch(this);
             if (!cracked)
             {
                 cracked = true;
@@ -223,10 +226,10 @@ namespace Crunchee.Core
         public void OnStep(Vector3 worldPos)
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
-            if (coating == Coating.Wax) { SpawnStepChips(worldPos); FlexShellAt(worldPos); }
+            if (coating == Coating.Wax || crackableCrust) { SpawnStepChips(worldPos); FlexShellAt(worldPos); }
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
                                coating == Coating.Wax ? waxLayers : 0, walkedSteps++);
-            if (coating == Coating.Wax && stepParticles != null) stepParticles.Emit(2);
+            if ((coating == Coating.Wax || crackableCrust) && stepParticles != null) stepParticles.Emit(2);
             if (coating == Coating.Sugar && stepParticles != null) stepParticles.Emit(7);
         }
 
@@ -293,13 +296,11 @@ namespace Crunchee.Core
                 if (seamlessShell != null)
                 {
                     seamlessShell.SetActive(false);
-                    for (int i = 0; i < shellPieces.Length; i++)
-                    {
-                        shellPieces[i].gameObject.SetActive(true);
-                        if (crackedShellMaterial != null)
-                            shellPieces[i].GetComponent<MeshRenderer>().sharedMaterial = crackedShellMaterial;
-                    }
+                    for (int i = 0; i < shellPieces.Length; i++) shellPieces[i].gameObject.SetActive(true);
                 }
+                if (crackedShellMaterial != null)
+                    for (int i = 0; i < shellPieces.Length; i++)
+                        shellPieces[i].GetComponent<MeshRenderer>().sharedMaterial = crackedShellMaterial;
                 var ls = coatingShell.transform.lossyScale;
                 Vector3 imp = coatingShell.transform.InverseTransformPoint(impact);
                 for (int i = 0; i < shellPieces.Length; i++)

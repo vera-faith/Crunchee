@@ -6,7 +6,7 @@ namespace Crunchee.Core
     public enum BaseMaterial
     {
         Butter, Croissant, CakeSponge, PawPad, Melon, Mochi,
-        Macaron, Chocolate, Donut, Grape, KeyboardKey, Toast, Jam
+        Macaron, Chocolate, Donut, Grape, KeyboardKey, Toast, Jam, Flour, Vanilla
     }
 
     /// <summary>Surface coating. Modifies look, step-on effect AND sound of any base material.</summary>
@@ -32,6 +32,9 @@ namespace Crunchee.Core
         {
             var p = new SquishProfile { squishDepth = 0.35f, springBack = 0.45f, bounceForce = 8f, hapticStrength = 0.4f, stickyRelease = false };
             if (b == BaseMaterial.Butter) { p.squishDepth = 0.5f; p.bounceForce = 0f; } // Butter Path: deep slow sink, no bounce
+            if (b == BaseMaterial.Flour) { p.squishDepth = 0.68f; p.bounceForce = 0f; p.hapticStrength = 0.16f; }
+            if (b == BaseMaterial.Vanilla) { p.squishDepth = 0.62f; p.springBack = 0.8f; p.bounceForce = 0f; p.hapticStrength = 0.12f; }
+            if (b == BaseMaterial.Croissant) { p.squishDepth = 0.32f; p.bounceForce = 0f; p.hapticStrength = 0.55f; }
             if (b == BaseMaterial.CakeSponge || b == BaseMaterial.Mochi) { p.squishDepth = 0.5f; p.hapticStrength = 0.25f; }
             if (b == BaseMaterial.KeyboardKey) { p.squishDepth = 0.18f; p.springBack = 0.18f; p.bounceForce = 3f; p.hapticStrength = 0.6f; }
             if (b == BaseMaterial.Chocolate || b == BaseMaterial.Macaron) { p.squishDepth = 0.15f; p.hapticStrength = 0.7f; }

@@ -240,7 +240,7 @@ namespace Crunchee.EditorTools
         }
 
         /// <summary>One soft cloud: a cluster of flattened matte puffs.</summary>
-        static void BuildCloud(Vector3 at, float scale, Material cloudMat)
+        static GameObject BuildCloud(Vector3 at, float scale, Material cloudMat)
         {
             var g = new GameObject("Cloud");
             g.transform.position = at;
@@ -255,6 +255,7 @@ namespace Crunchee.EditorTools
                      new Vector3(1.1f * b.s * scale, 0.55f * b.s * scale, 0.85f * b.s * scale), cloudMat);
             foreach (var r in g.GetComponentsInChildren<MeshRenderer>())
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return g;
         }
 
         // ======================================================== bakery hall

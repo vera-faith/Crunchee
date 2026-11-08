@@ -24,7 +24,6 @@ namespace Crunchee.EditorTools
         {
             meshCache.Clear();
             propMats.Clear();
-            if (AssetDatabase.IsValidFolder(GeneratedMeshDir)) AssetDatabase.DeleteAsset(GeneratedMeshDir);
             Directory.CreateDirectory(GeneratedMeshDir);
             AssetDatabase.Refresh();
         }
