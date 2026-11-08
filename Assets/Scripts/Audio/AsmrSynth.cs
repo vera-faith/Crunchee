@@ -4,15 +4,13 @@ using Crunchee.Core;
 namespace Crunchee.Audio
 {
     /// <summary>
-    /// Original procedural ASMR synthesis. A crack is a clustered burst of
-    /// micro-fractures - one sharp onset transient plus a modal ring, then
-    /// 6-12 secondary crackles spread over ~0.15-0.45 s with falling
-    /// amplitude, then a tiny settle (matched to the ASMR reference: every
-    /// footstep on wax reads as a small crackle cluster, a full landing as a
-    /// dense broadband crunch). Every base material has its own character;
-    /// wax layers 1..10 morph continuously from thin glassy tick-snaps to
-    /// deep chunky crunches. All filtered noise (one-pole LP/HP bands) -
-    /// never raw first-difference.
+    /// Original procedural ASMR synthesis. A wax crack is a dense Poisson
+    /// swarm of distinct sub-millisecond clicks (two-pole resonators excited
+    /// by tapered impulses) with power-law sizes over a crunchy low body -
+    /// matched to the TikTok reference where every footstep on wax reads as
+    /// a continuous crackle and a full landing as a broadband crunch. Every
+    /// base material has its own character; wax layers 1..10 morph
+    /// continuously from thin glassy crackle to deep chunky crunches.
     /// </summary>
     public static class AsmrSynth
     {
@@ -78,81 +76,168 @@ namespace Crunchee.Audio
             }
         }
 
-        // ============================== AU2: coherent wax crack ============
+        // ============================== AU2: wax crackle swarms ===========
+
+        /// <summary>ONE wax micro-fracture: a two-pole resonator at fRes
+        /// (tau in ms) excited by a short tapered noise impulse. The output
+        /// mixes the resonator with a little of the raw impulse for
+        /// broadband crispness, then normalizes so amp IS the click's peak
+        /// (resonator gain varies wildly with fRes, which otherwise makes
+        /// low clicks swamp the power-law sizes).</summary>
+        static void AddClick(float[] d, int at, float amp, float fRes, float tauMs, System.Random r)
+        {
+            double rad = System.Math.Exp(-1.0 / (tauMs * 0.001 * SR));
+            double c1 = 2 * rad * System.Math.Cos(2 * System.Math.PI * fRes / SR);
+            double c2 = -rad * rad;
+            int impLen = 2 + r.Next(5);                       // 2-6 samples
+            int n = (int)(6 * tauMs * 0.001 * SR) + 8;
+            var mix = new float[n];
+            double y1 = 0, y2 = 0;
+            double scale = (1 - rad) * 4.0;
+            float pk = 0.000000001f;
+            for (int i = 0; i < n; i++)
+            {
+                double x = i < impLen ? Noise(r) * (1f - i / (float)impLen) : 0;
+                double y = x + c1 * y1 + c2 * y2;
+                y2 = y1; y1 = y;
+                mix[i] = (float)(y * scale + x * 0.12);
+                pk = Mathf.Max(pk, Mathf.Abs(mix[i]));
+            }
+            for (int i = 0; i < n && at + i < d.Length; i++)
+                if (at + i >= 0) d[at + i] += mix[i] * amp / pk;
+        }
+
+        /// <summary>A Poisson swarm of clicks: rate shaped by a rise/hold/
+        /// taper envelope over [t0, t0+dur], sizes Pareto (alpha 1.15) with
+        /// a mid-swell, frequencies log-uniform with big clicks lower, one
+        /// quarter spawning micro-burst children, every click adding a low
+        /// body grain, plus one hero snap at heroPos through the swarm.
+        /// </summary>
+        static void CrackleSwarm(float[] d, float t0, float dur, float rate,
+                                 float fLo, float fHi, float tauLo, float tauHi,
+                                 float bodyAmt, float amp, float heroPos, System.Random r)
+        {
+            float t = t0;
+            int guard = 0;
+            while (guard++ < 100000)
+            {
+                float x = Mathf.Clamp01((t - t0) / dur);
+                float shape = x < 0.06f ? x / 0.06f
+                            : x > 0.75f ? 1f - 0.6f * (x - 0.75f) / 0.25f
+                            : 1f;
+                if (shape < 0.05f) shape = 0.05f;
+                t += (float)(-System.Math.Log(r.NextDouble() * 0.999999 + 0.000001) / (rate * shape));
+                if (t >= t0 + dur) break;
+                float xc = (t - t0) / dur;
+                float rel = Mathf.Min(13f, Mathf.Pow((float)r.NextDouble(), -1f / 1.15f));
+                float a = amp * 0.10f * Mathf.Pow(rel, 1.25f) * (0.7f + 0.3f * Mathf.Sin(Mathf.PI * xc));
+                float fRes = Mathf.Max(900f, fLo * Mathf.Pow(fHi / fLo, (float)r.NextDouble())
+                                           * Mathf.Pow(rel, -0.10f));
+                float tau = tauLo * Mathf.Pow(tauHi / tauLo, (float)r.NextDouble());
+                int at = (int)(t * SR);
+                AddClick(d, at, a, fRes, tau, r);
+                // every click drags a little 150-1200 Hz body grain
+                BandNoise(d, at, (int)((0.003f + (float)r.NextDouble() * 0.005f) * SR),
+                          150f, 1200f, a * bodyAmt, 500f, r);
+                // micro-burst: 1-3 children within the next 0.3-1.5 ms
+                if (r.NextDouble() < 0.25)
+                {
+                    int kids = 1 + r.Next(3);
+                    for (int k = 0; k < kids; k++)
+                    {
+                        int cat = (int)((t + (0.0003f + (float)r.NextDouble() * 0.0012f)) * SR);
+                        float cf = Mathf.Max(900f, fLo * Mathf.Pow(fHi / fLo, (float)r.NextDouble()));
+                        AddClick(d, cat, a * (0.3f + (float)r.NextDouble() * 0.4f), cf,
+                                 tauLo * Mathf.Pow(tauHi / tauLo, (float)r.NextDouble()), r);
+                    }
+                }
+            }
+            // hero snap: the one big fracture every crack needs, placed in
+            // the 4-6 kHz detection band so it always reads as THE snap
+            float hx = heroPos;
+            int hat = (int)((t0 + hx * dur) * SR);
+            float ha = amp * 0.08f * 42f * (0.7f + 0.3f * Mathf.Sin(Mathf.PI * hx));
+            AddClick(d, hat, ha, Mathf.Lerp(4000f, 6000f, (float)r.NextDouble()), 2.5f, r);
+            BandNoise(d, hat, (int)((0.003f + (float)r.NextDouble() * 0.005f) * SR),
+                      150f, 1200f, ha * bodyAmt * 2f, 500f, r);
+        }
+
+        /// <summary>Peak-normalize, soft-saturate, a gentle one-pole
+        /// low-pass to seat the clicks in the reference's darker band,
+        /// then clip at target.</summary>
+        static AudioClip CrackClip(string name, float[] d, float target, float lpHz = 6000f)
+        {
+            float pk = 0.0001f;
+            foreach (var v in d) pk = Mathf.Max(pk, Mathf.Abs(v));
+            float t = Mathf.Tanh(1.25f);
+            float aL = Mathf.Exp(-2f * Mathf.PI * lpHz / SR);
+            float lp = 0f;
+            for (int i = 0; i < d.Length; i++)
+            {
+                lp = aL * lp + (1f - aL) * Mathf.Tanh(1.25f * d[i] / pk) / t;
+                d[i] = lp;
+            }
+            return ToClip(name, d, target);
+        }
 
         /// <summary>
-        /// ONE landing fracture for layer n, matched to the reference: a sharp
-        /// broadband onset transient + modal ring, then a dense cascade of
-        /// 6-12 secondary crackles spread over ~0.15-0.45 s (longer the
-        /// thicker the wax) with falling amplitude and per-crackle band
-        /// jitter so no two snaps sound identical, then a short settle.
-        /// Thin wax (n=1) reads bright and glassy ~3-6 kHz; thick wax (n=10)
-        /// reaches down to a 90-150 Hz body thump and keeps crackle energy
-        /// flat out past 10 kHz. Deterministic.
+        /// ONE landing fracture for layer n, matched to the reference: a
+        /// ~0.5-0.8 s dense swarm of distinct sub-ms clicks (210-280/s,
+        /// power-law sized) over a crunchy low body, one hero snap early,
+        /// chunk snaps and a body thump as wax thickens, then a sparse
+        /// settle tail. Thin wax reads bright and glassy; thick wax drops
+        /// the band and adds weight. Deterministic.
         /// </summary>
         public static AudioClip WaxCrack(int layers, int seed)
         {
             layers = Mathf.Clamp(layers, 1, 10);
             var r = new System.Random(seed * 104729 + layers * 131);
             float f = (layers - 1) / 9f;                       // 0 thin .. 1 thick
-            float dur = Mathf.Lerp(0.2f, 0.52f, f) + 0.08f;
-            var d = NewBuf(dur);
-            // ring frequencies fall as the shell gets heavier
-            float fA = Mathf.Lerp(5200f, 2200f, f) * (0.96f + (float)r.NextDouble() * 0.08f);
-            float fB = fA * (1.31f + (float)r.NextDouble() * 0.2f);
-            float ringDecay = Mathf.Lerp(120f, 45f, f);        // thin rings die fast
-            // the initial transient: one sharp click in the ring band
-            BandNoise(d, 0, (int)Mathf.Lerp(900f, 2600f, f), Mathf.Lerp(1500f, 600f, f), Mathf.Lerp(9500f, 4500f, f), 1f, Mathf.Lerp(60f, 16f, f) * 40f, r);
-            AddRing(d, 0, fA, 0.55f, ringDecay, Mathf.Lerp(0.05f, 0.16f, f));
-            AddRing(d, 0, fB, 0.3f, ringDecay * 1.4f, Mathf.Lerp(0.04f, 0.13f, f));
-            if (f > 0.4f) AddThump(d, 0, Mathf.Lerp(150f, 95f, f), Mathf.Lerp(0f, 0.42f, (f - 0.4f) / 0.6f), 0.12f);
-            // secondary fractures: a dense jittered cascade, falling off.
-            // Reference bursts carry 8-13 crackles over ~0.3-0.45 s.
-            int n2 = Mathf.RoundToInt(Mathf.Lerp(6f, 12f, f));
-            float at = 0.006f;
-            for (int s = 0; s < n2; s++)
+            float dur = Mathf.Lerp(0.55f, 0.85f, f);
+            var d = NewBuf(dur + 0.15f);
+            float fLo = Mathf.Lerp(2200f, 1700f, f), fHi = Mathf.Lerp(7500f, 5500f, f);
+            float tauLo = Mathf.Lerp(0.8f, 1.1f, f), tauHi = Mathf.Lerp(2.0f, 3.0f, f);
+            CrackleSwarm(d, 0.005f, dur, Mathf.Lerp(450f, 480f, f), fLo, fHi,
+                         tauLo, tauHi, Mathf.Lerp(2.3f, 2.9f, f), 1f,
+                         0.25f + (float)r.NextDouble() * 0.15f, r);
+            if (f > 0.3f)
             {
-                int st = (int)(at * SR);
-                float a = Mathf.Lerp(0.55f, 0.14f, s / (float)n2) * (0.75f + (float)r.NextDouble() * 0.35f);
-                // band jitters per crackle: thin wax stays bright, thick wax
-                // sweeps lower with more spread, both keep >6 kHz sparkle.
-                float j = (float)r.NextDouble();
-                float lo = Mathf.Lerp(1400f, 500f, f) * Mathf.Lerp(0.85f, 1.3f, j);
-                float hi = Mathf.Lerp(9000f, 4200f, f) * Mathf.Lerp(1.0f, 1.35f, j);
-                BandNoise(d, st, (int)Mathf.Lerp(500f, 1400f, f), lo, hi, a, Mathf.Lerp(55f, 13f, f) * 40f, r);
-                AddRing(d, st, fA * (0.85f + (float)r.NextDouble() * 0.3f), a * 0.4f, ringDecay * 1.6f, 0.05f);
-                at += Mathf.Lerp(0.012f, 0.035f, f) * (0.4f + (float)r.NextDouble());
+                // chunk snaps: big plates letting go through the crunch
+                int chunks = 1 + Mathf.RoundToInt(3f * f);
+                for (int s = 0; s < chunks; s++)
+                {
+                    int at = (int)((0.1f + (float)r.NextDouble() * 0.6f) * dur * SR);
+                    AddClick(d, at, 0.55f, Mathf.Lerp(1500f, 2500f, (float)r.NextDouble()), 2.5f, r);
+                    AddRing(d, at, Mathf.Lerp(2200f, 900f, f) * (0.85f + (float)r.NextDouble() * 0.3f),
+                            0.15f, 250f, 0.05f);
+                }
+                AddThump(d, 0, Mathf.Lerp(150f, 95f, f), 0.25f * f, 0.1f);
             }
-            // tiny settle: a short soft grain wash
-            BandNoise(d, (int)(at * SR), (int)(0.06f * SR), 1500f, 6000f, 0.1f, 30f, r);
-            return ToClip($"Synth_Wax_{layers}", d, 0.92f);
+            // sparse settle tail
+            CrackleSwarm(d, 0.005f + dur, 0.1f, 40f, fLo, fHi, tauLo, tauHi,
+                         Mathf.Lerp(2.3f, 2.9f, f), 0.35f, 0.5f, r);
+            return CrackClip($"Synth_Wax_{layers}", d, 0.95f);
         }
 
         /// <summary>
-        /// One footstep on cracked wax: a SMALL crackle cluster, not a single
-        /// tick - 3-6 micro-fractures over ~40-130 ms, brightest at thin wax,
-        /// chunkier and slightly longer as layers stack. Every step crackles.
+        /// One footstep on wax: a ~0.4-0.52 s crackle swarm, sparser than a
+        /// landing but the same anatomy - distinct clicks, power-law sizes,
+        /// hero snap mid-step, crunchy low body. Fired every step so walking
+        /// reads as continuous crackle like the reference.
         /// </summary>
         public static AudioClip WaxStepCrack(int layers, int seed)
         {
             layers = Mathf.Clamp(layers, 1, 10);
             var r = new System.Random(seed * 31337 + layers * 71);
             float f = (layers - 1) / 9f;
-            var d = NewBuf(Mathf.Lerp(0.14f, 0.24f, f));
-            int n = Mathf.RoundToInt(Mathf.Lerp(3f, 6f, f));
-            float at = 0f;
-            for (int s = 0; s < n; s++)
-            {
-                float a = Mathf.Lerp(0.9f, 0.3f, s / (float)n) * (0.7f + (float)r.NextDouble() * 0.4f);
-                float j = (float)r.NextDouble();
-                BandNoise(d, (int)(at * SR), (int)Mathf.Lerp(450f, 1200f, f),
-                          Mathf.Lerp(1600f, 700f, f) * Mathf.Lerp(0.9f, 1.25f, j),
-                          Mathf.Lerp(10000f, 4200f, f) * Mathf.Lerp(1.0f, 1.3f, j),
-                          a, Mathf.Lerp(60f, 20f, f) * 40f, r);
-                at += Mathf.Lerp(0.008f, 0.03f, f) * (0.4f + (float)r.NextDouble());
-            }
-            AddRing(d, 0, Mathf.Lerp(4200f, 1600f, f), 0.28f, Mathf.Lerp(110f, 50f, f), 0.05f);
-            return ToClip("Synth_WaxStep", d, 0.6f);
+            float dur = Mathf.Lerp(0.4f, 0.52f, f);
+            var d = NewBuf(dur + 0.15f);
+            CrackleSwarm(d, 0.003f, dur, Mathf.Lerp(330f, 420f, f),
+                         Mathf.Lerp(2400f, 2100f, f), Mathf.Lerp(5000f, 4300f, f),
+                         Mathf.Lerp(0.6f, 0.8f, f), Mathf.Lerp(1.6f, 2.5f, f),
+                         Mathf.Lerp(1.7f, 2.0f, f), 1f,
+                         0.35f + (float)r.NextDouble() * 0.2f, r);
+            return CrackClip("Synth_WaxStep", d, 0.85f, 5000f);
         }
 
         // ============================== AU3: per-material bases ============
@@ -373,205 +458,174 @@ namespace Crunchee.Audio
                 deep ? 0.6f : 0.35f);
         }
 
-        // ============================== AU6: lofi beat bed =================
+        // ============================== AU6: cozy tune ====================
 
         static float MidiHz(float midi) => 440f * Mathf.Pow(2f, (midi - 69f) / 12f);
 
-        /// <summary>Warm electric-piano note: a soft ~12 ms felt attack, a
-        /// long mellow decay, quiet close partials, a slightly detuned
-        /// partner and an optional gentle tremolo for the Rhodes shimmer.
-        /// Round and dusty, no metallic ding.</summary>
-        static void AddKeysNote(float[] buf, float midi, double start, float amp,
-                                float tremHz = 0f)
-        {
-            int n = buf.Length, count = (int)(2.4 * SR);
-            double f = MidiHz(midi);
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR;
-                double env = System.Math.Exp(-t * 2.1) * System.Math.Min(1.0, t / 0.012);
-                if (tremHz > 0f) env *= 1.0 + 0.13 * System.Math.Sin(2 * System.Math.PI * tremHz * t);
-                double v = (System.Math.Sin(2 * System.Math.PI * f * t)
-                          + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 1.003 * t)
-                          + 0.2 * System.Math.Sin(2 * System.Math.PI * f * 2.01 * t)
-                          + 0.06 * System.Math.Sin(2 * System.Math.PI * f * 3.02 * t)) * env * amp;
-                buf[((int)(start * SR) + i) % n] += (float)v;
-            }
-        }
-
-        /// <summary>Soft round sub-bass note: quick attack, slow decay, a
-        /// little octave harmonic so it reads on phone speakers.</summary>
-        static void AddBass(float[] buf, float midi, double start, double len, float amp)
-        {
-            int n = buf.Length, count = (int)(len * SR);
-            double f = MidiHz(midi);
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR;
-                double env = System.Math.Min(1.0, t / 0.01) * System.Math.Exp(-t * 2.6);
-                double v = System.Math.Sin(2 * System.Math.PI * f * t)
-                         + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 2 * t);
-                buf[((int)(start * SR) + i) % n] += (float)(v * env * amp);
-            }
-        }
-
-        /// <summary>Boomy lofi kick: a fast sine drop ~110-46 Hz pushed
-        /// through soft saturation so it thumps without a hard click.</summary>
-        static void AddKick(float[] buf, double start, float amp)
-        {
-            int n = buf.Length, count = (int)(0.24 * SR);
-            double ph = 0;
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR;
-                double f = 110 * System.Math.Exp(-t * 30) + 46;
-                ph += 2 * System.Math.PI * f / SR;
-                double env = System.Math.Exp(-t * 15) * System.Math.Min(1.0, t / 0.0015);
-                buf[((int)(start * SR) + i) % n] +=
-                    (float)(System.Math.Tanh(System.Math.Sin(ph) * env * amp * 2.2) * 0.55);
-            }
-        }
-
-        /// <summary>Laid-back snare: band-limited noise ~1.3-4.2 kHz over a
-        /// ~190 Hz body - played a hair late for the lofi drag.</summary>
-        static void AddSnare(float[] buf, double start, float amp, System.Random r)
-        {
-            int n = buf.Length, count = (int)(0.17 * SR);
-            float lp = 0, hp = 0;
-            float aL = Mathf.Exp(-2f * Mathf.PI * 4200f / SR);
-            float aH = Mathf.Exp(-2f * Mathf.PI * 1300f / SR);
-            double ph = 0;
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR;
-                double env = System.Math.Exp(-t * 28) * System.Math.Min(1.0, t / 0.001);
-                lp = aL * lp + (1f - aL) * Noise(r);
-                hp = aH * hp + (1f - aH) * lp;
-                ph += 2 * System.Math.PI * 190 / SR;
-                buf[((int)(start * SR) + i) % n] += (float)((lp - hp) * env * amp
-                    + System.Math.Sin(ph) * System.Math.Exp(-t * 20) * amp * 0.45);
-            }
-        }
-
-        /// <summary>Swung hat: a short >7.4 kHz tick, or an open sizzle.</summary>
-        static void AddHat(float[] buf, double start, float amp, bool open, System.Random r)
-        {
-            int n = buf.Length, count = (int)((open ? 0.24 : 0.05) * SR);
-            float hp = 0;
-            float aH = Mathf.Exp(-2f * Mathf.PI * 7400f / SR);
-            double decay = open ? 14.0 : 110.0;
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR;
-                hp = aH * hp + (1f - aH) * Noise(r);
-                buf[((int)(start * SR) + i) % n] += hp * (float)System.Math.Exp(-t * decay) * amp;
-            }
-        }
-
-        /// <summary>Record texture: a bed of low-passed hiss plus sparse
-        /// pops - dusty, present, never loud.</summary>
-        static void AddVinyl(float[] buf, System.Random r)
-        {
-            int n = buf.Length;
-            float lp = 0;
-            float aL = Mathf.Exp(-2f * Mathf.PI * 2600f / SR);
-            for (int i = 0; i < n; i++)
-            {
-                lp = aL * lp + (1f - aL) * Noise(r);
-                buf[i] += lp * 0.013f;
-            }
-            for (int p = 0; p < 30; p++)
-            {
-                int st = (int)(r.NextDouble() * (n - 64));
-                float a = 0.015f + (float)r.NextDouble() * 0.035f;
-                for (int i = 0; i < 48; i++)
-                    buf[st + i] += Noise(r) * a * Mathf.Exp(-i * 0.22f);
-            }
-        }
-
         /// <summary>
-        /// Lofi beat loop - an original chill-hop groove: the classic
-        /// I-vi-ii-V turnaround in C dressed as jazz extensions
-        /// (Cmaj9 - Am9 - Dm9 - G13, twice around) on warm electric-piano
-        /// stabs with a bounced re-hit, a hopping sub-bass, boom-bap kicks,
-        /// snares dragged a hair late, swung hats with human timing jitter,
-        /// and a dusty vinyl bed. The felt-keys hook sings a little
-        /// question-and-answer over it and rests at the seam so the V into
-        /// the wrap-around I keeps it circling forever. ~78 BPM, ~25 s,
-        /// seamless, ORIGINAL composition, sits quietly under the ASMR.
+        /// ORIGINAL cozy tune (C mixolydian-flavoured): a sustained
+        /// near-pure-tone "ocarina/whistle" lead - one continuous
+        /// phase-accumulating oscillator with slurred slides between notes,
+        /// trills, slow-blooming vibrato and a breathy edge - over a held
+        /// bass pedal and a soft breathing pad. NO drums and nothing that
+        /// decays like a piano, so the wax cracks always stay clear on top.
+        /// 112 BPM, 16 bars (~34.3 s), seamless loop (all wrap tails written
+        /// modulo the buffer length).
         /// </summary>
-        public static AudioClip LofiLoop()
+        public static AudioClip CozyTune()
         {
-            var r = new System.Random(4242);
-            const double beat = 60.0 / 78.0;             // 78 bpm
+            var r = new System.Random(7777);
+            const double beat = 60.0 / 112.0;
             const double bar = beat * 4;
-            const int bars = 8;
-            var buf = new float[(int)(bar * bars * SR)]; // ~24.6 s loop
-            const double swing = 0.13 * beat;            // offbeats drag ~62/38
-            double Jit() => (r.NextDouble() * 2 - 1) * 0.014;
+            const int bars = 16;
+            int n = (int)(bar * bars * SR);
+            var buf = new float[n];
+            var lead = new float[n];
 
-            // jazzy rootless voicings - the bass owns the roots
-            float[][] chords =
+            int[][] pads =
             {
-                new float[] { 64, 67, 71, 74 }, // Cmaj9: E G B D
-                new float[] { 67, 71, 72, 76 }, // Am9:   G B C E
-                new float[] { 65, 69, 72, 76 }, // Dm9:   F A C E
-                new float[] { 65, 69, 71, 76 }, // G13:   F A B E
+                new[] { 55, 62, 64, 67 }, new[] { 55, 62, 64, 67 },
+                new[] { 58, 62, 65 }, new[] { 58, 62, 65 },
+                new[] { 57, 60, 65 }, new[] { 57, 60, 65 },
+                new[] { 57, 60, 62, 65 }, new[] { 58, 62, 65, 67 },
+                new[] { 55, 60, 64, 67 }, new[] { 57, 60, 64, 65 },
+                new[] { 57, 62, 65, 69 }, new[] { 55, 60, 64, 67 },
+                new[] { 55, 60, 64, 67 }, new[] { 57, 60, 62, 65 },
+                new[] { 57, 62, 65, 69 }, new[] { 58, 62, 65, 67 },
             };
-            float[] roots = { 36, 33, 38, 31 };          // C2 A1 D2 G1
+            int[] bassRoots = { 36, 36, 36, 36, 36, 36, 36, 36,
+                                33, 38, 34, 36, 33, 38, 34, 36 };
 
+            var melody = new (int bar, double beat, int midi, double dur)[]
+            {
+                (0, 0.0, 76, 0.5), (0, 0.5, 74, 0.5), (0, 1.0, 72, 1.0),
+                (0, 2.0, 67, 0.25), (0, 2.25, 69, 1.75),
+                (1, 1.0, 72, 0.5), (1, 1.5, 74, 0.5), (1, 2.0, 76, 0.15),
+                (1, 2.15, 77, 0.15), (1, 2.3, 76, 0.15), (1, 2.45, 77, 0.15),
+                (1, 2.6, 76, 1.4),
+                (2, 0.0, 77, 1.0), (2, 1.0, 74, 0.5), (2, 1.5, 70, 0.5),
+                (2, 2.0, 74, 2.0),
+                (3, 0.0, 72, 0.5), (3, 0.5, 74, 0.5), (3, 1.0, 76, 0.25),
+                (3, 1.25, 77, 1.75),
+                (4, 0.0, 81, 1.5), (4, 1.5, 79, 0.5), (4, 2.0, 77, 0.5),
+                (4, 2.5, 72, 1.5),
+                (5, 0.5, 77, 0.5), (5, 1.0, 79, 0.5), (5, 1.5, 81, 0.25),
+                (5, 1.75, 82, 0.25), (5, 2.0, 81, 0.15), (5, 2.15, 82, 0.15),
+                (5, 2.3, 81, 1.7),
+                (6, 0.0, 77, 1.0), (6, 1.0, 74, 0.5), (6, 1.5, 72, 0.5),
+                (6, 2.0, 69, 1.0), (6, 3.0, 72, 0.5), (6, 3.5, 74, 0.5),
+                (7, 0.0, 74, 2.0), (7, 3.5, 67, 0.5),
+                (8, 0.0, 72, 0.5), (8, 0.5, 76, 0.5), (8, 1.0, 79, 1.5),
+                (8, 2.5, 76, 0.5), (8, 3.0, 74, 1.0),
+                (9, 0.0, 76, 0.25), (9, 0.25, 77, 1.25), (9, 1.5, 76, 0.5),
+                (9, 2.0, 74, 0.5), (9, 2.5, 72, 0.5), (9, 3.0, 69, 1.0),
+                (10, 0.0, 74, 1.5), (10, 1.5, 77, 0.5), (10, 2.0, 81, 0.15),
+                (10, 2.15, 82, 0.15), (10, 2.3, 81, 1.7),
+                (11, 0.0, 79, 1.0), (11, 1.0, 76, 0.5), (11, 1.5, 72, 0.5),
+                (11, 2.0, 67, 0.25), (11, 2.25, 69, 0.25), (11, 2.5, 72, 1.5),
+                (12, 0.0, 76, 0.5), (12, 0.5, 79, 0.5), (12, 1.0, 81, 1.5),
+                (12, 2.5, 79, 0.5), (12, 3.0, 76, 1.0),
+                (13, 0.0, 77, 0.5), (13, 0.5, 76, 0.5), (13, 1.0, 74, 0.5),
+                (13, 1.5, 72, 0.5), (13, 2.0, 74, 0.15), (13, 2.15, 76, 0.15),
+                (13, 2.3, 74, 1.7),
+                (14, 0.0, 77, 1.5), (14, 1.5, 74, 0.5), (14, 2.0, 70, 0.5),
+                (14, 2.5, 72, 0.5), (14, 3.0, 74, 1.0),
+                (15, 0.0, 72, 2.5),
+            };
+
+            // ---------- pad: soft breathing voicing per bar ----------
             for (int b = 0; b < bars; b++)
             {
-                int c = b % 4;
-                double at = b * bar;
-                // electric-piano stab: slight strum, plus a bounced second
-                // stab on the "and" of 3 every other bar
-                for (int k = 0; k < chords[c].Length; k++)
+                foreach (var m in pads[b])
                 {
-                    AddKeysNote(buf, chords[c][k], at + k * 0.009 + Jit(), 0.1f, 4.2f);
-                    if (b % 2 == 1)
-                        AddKeysNote(buf, chords[c][k],
-                                    at + beat * 2.5 + swing + k * 0.009 + Jit(), 0.05f, 4.2f);
+                    double f = MidiHz(m);
+                    int st = (int)(b * bar * SR), len = (int)((bar + 0.6) * SR);
+                    for (int i = 0; i < len; i++)
+                    {
+                        double t = i / (double)SR;
+                        double env = System.Math.Min(1.0, t / 0.35)
+                                   * System.Math.Min(1.0, (len - i) / (0.6 * SR));
+                        double trem = 1.0 + 0.1 * System.Math.Sin(2 * System.Math.PI * 0.15 * (b * bar + t));
+                        // absolute-time phase: a note held into the next bar
+                        // overlaps in phase instead of cancelling
+                        double ph = 2 * System.Math.PI * f * (st + i) / SR;
+                        buf[(st + i) % n] += (float)((System.Math.Sin(ph)
+                            + 0.04 * System.Math.Sin(2 * ph)) * env * trem * 0.045);
+                    }
                 }
-                // bass: root on beat 1, octave-up hop on the "and" of 3
-                AddBass(buf, roots[c], at + 0.05 + Jit(), beat * 1.7, 0.16f);
-                AddBass(buf, roots[c] + 12, at + beat * 2.5 + swing + Jit(), beat * 0.55, 0.1f);
-                // boom-bap: kick on 1 and the "and" of 3, snares on 2 & 4 late
-                AddKick(buf, at + Jit(), 0.32f);
-                AddKick(buf, at + beat * 2.5 + swing + Jit(), 0.24f);
-                if (c == 3) AddKick(buf, at + beat * 1.5 + swing + Jit(), 0.2f);
-                AddSnare(buf, at + beat + 0.02 + Jit(), 0.22f, r);
-                AddSnare(buf, at + beat * 3 + 0.028 + Jit(), 0.2f, r);
-                // swung hats, alternating emphasis with velocity variation
-                for (int j = 0; j < 8; j++)
-                {
-                    bool off = j % 2 == 1;
-                    double ht = at + beat * j / 2 + (off ? swing : 0) + Jit();
-                    AddHat(buf, ht, (off ? 0.028f : 0.045f) * (0.85f + (float)r.NextDouble() * 0.3f), false, r);
-                }
-                if (c == 3) AddHat(buf, at + beat * 3.5 + swing + Jit(), 0.05f, true, r);
             }
 
-            // cute felt-keys hook: a question-and-answer that rests at the seam
-            var melody = new (int bar, double beat, float midi)[]
+            // ---------- bass pedal: per-bar root + octave, half-bar bounce ----------
+            for (int b = 0; b < bars; b++)
             {
-                (0, 0.0, 76), (0, 1.5, 79), (0, 2.5, 81), (0, 3.5, 79), // E G A G - hops up and down
-                (1, 0.0, 76), (1, 3.0, 74), (1, 3.75, 76),              // E ... D E
-                (2, 0.0, 77), (2, 1.5, 76), (2, 2.5, 74), (2, 3.5, 72), // F E D C - tumbles home
-                (3, 0.5, 69), (3, 2.5, 71),                             // A ... B - hangs on the V
-                (4, 0.0, 79), (4, 1.5, 76), (4, 2.5, 81), (4, 3.5, 79), // higher bounce, same shape
-                (5, 0.0, 74), (5, 3.0, 72), (5, 3.75, 74),              // D ... C D
-                (6, 0.0, 76), (6, 1.0, 79), (6, 2.5, 77), (6, 3.5, 74), // E G F D - lazy walk down
-                (7, 0.5, 71), (7, 2.0, 69),                             // B A - resolves into the wrap
-            };
-            foreach (var (b, bt, m) in melody)
-            {
-                double mt = b * bar + bt * beat + (bt % 1.0 > 0.4 ? swing : 0) + Jit();
-                AddKeysNote(buf, m, mt, 0.09f);
-                AddKeysNote(buf, m + 12, mt + 0.006, 0.026f); // octave sparkle
+                double f = MidiHz(bassRoots[b]);
+                int st = (int)(b * bar * SR), len = (int)((bar + 0.08) * SR);
+                for (int i = 0; i < len; i++)
+                {
+                    double t = i / (double)SR;
+                    double env = System.Math.Min(1.0, t / 0.08)
+                               * System.Math.Min(1.0, (len - i) / (0.08 * SR));
+                    double half = t % (bar * 0.5);
+                    env *= 1.0 - 0.1 * System.Math.Exp(-half / 0.12);
+                    double ph = 2 * System.Math.PI * f * (st + i) / SR; // in phase across bars
+                    buf[(st + i) % n] += (float)((System.Math.Sin(ph)
+                        + 0.4 * System.Math.Sin(2 * ph)) * env * 0.16);
+                }
             }
-            AddVinyl(buf, r);
-            return ToClip("Synth_Lofi", buf, 0.42f); // stays deep under the ASMR
+
+            // ---------- ocarina lead: one continuous oscillator ----------
+            double aPitch = System.Math.Exp(-1.0 / (0.028 * SR)); // 28 ms slur
+            double aAtk = System.Math.Exp(-1.0 / (0.070 * SR));
+            double aRel = System.Math.Exp(-1.0 / (0.090 * SR));
+            double lgF = System.Math.Log(MidiHz(melody[0].midi)), lgT = lgF;
+            double ph2 = 0, ampEnv = 0;
+            float bLp = 0, bHp = 0;
+            float aBL = Mathf.Exp(-2f * Mathf.PI * 3500f / SR);
+            float aBH = Mathf.Exp(-2f * Mathf.PI * 1200f / SR);
+            int ni = 0;
+            double curEnd = -1, lastOnset = -1, prevEnd = -1;
+            for (int i = 0; i < n; i++)
+            {
+                double t = i / (double)SR;
+                if (ni < melody.Length && t >= (melody[ni].bar * bar + melody[ni].beat * beat))
+                {
+                    double st2 = melody[ni].bar * bar + melody[ni].beat * beat;
+                    bool legato = prevEnd >= 0 && st2 - prevEnd <= 0.02;
+                    if (!legato) lastOnset = t;
+                    prevEnd = st2 + melody[ni].dur * beat;
+                    curEnd = prevEnd;
+                    lgT = System.Math.Log(MidiHz(melody[ni].midi));
+                    ni++;
+                }
+                lgF = aPitch * lgF + (1 - aPitch) * lgT;
+                bool gate = t < curEnd;
+                ampEnv += ((gate ? 1.0 : 0.0) - ampEnv) * (1 - (gate ? aAtk : aRel));
+                double vibDepth = lastOnset >= 0 ? System.Math.Min(1.0, (t - lastOnset) / 0.25) : 0;
+                double vib = System.Math.Sin(2 * System.Math.PI * 5.0 * t) * vibDepth * 14.0; // cents
+                ph2 += 2 * System.Math.PI * System.Math.Exp(lgF) * System.Math.Pow(2, vib / 1200.0) / SR;
+                float breath = Noise(r);
+                bLp = aBL * bLp + (1f - aBL) * breath;
+                bHp = aBH * bHp + (1f - aBH) * bLp;
+                double breathGain = 0.02 * ampEnv;
+                lead[i] = (float)(((System.Math.Sin(ph2) + 0.05 * System.Math.Sin(2 * ph2)
+                    + 0.02 * System.Math.Sin(3 * ph2)) * ampEnv * 0.16)
+                    + (bLp - bHp) * breathGain);
+            }
+
+            // ---------- echo on the lead only: 0.2 and 0.4 beat taps, LP'd ----------
+            int d1 = (int)(0.2 * beat * SR), d2 = (int)(0.4 * beat * SR);
+            float aEL = Mathf.Exp(-2f * Mathf.PI * 2500f / SR);
+            var lpLead = new float[n];
+            float eLp = 0;
+            for (int i = 0; i < n; i++)
+            {
+                eLp = aEL * eLp + (1f - aEL) * lead[i];
+                lpLead[i] = eLp;
+            }
+            for (int i = 0; i < n; i++)
+                buf[i] += lead[i] + lpLead[(i - d1 + n) % n] * 0.10f + lpLead[(i - d2 + n) % n] * 0.05f;
+
+            return ToClip("Synth_Cozy", buf, 0.14f);
         }
     }
 }

@@ -8,9 +8,9 @@ namespace Crunchee.Audio
     /// ASMR playback engine (redesign, Nov 6): a small POOL of voices - every
     /// one-shot gets its own AudioSource so pitch/volume never bend a sound
     /// already playing. spatialBlend is low for intimacy. Landing = squish
-    /// first, crack ~0.07 s later and LOUDER. Footsteps are quiet squishes
-    /// with an occasional small crackle. Music ducks under cracks.
-    /// Recorded clips (SoundTable) still win when assigned.
+    /// first, crack ~0.07 s later and LOUDER. Every footstep on wax crackles.
+    /// The cozy tune ducks hard under cracks - the ASMR is always clearly
+    /// on top. Recorded clips (SoundTable) still win when assigned.
     /// </summary>
     public class AsmrAudio : MonoBehaviour
     {
@@ -64,22 +64,22 @@ namespace Crunchee.Audio
         {
             if (musicSource.clip == null)
             {
-                musicSource.clip = Synth("lofi", () => AsmrSynth.LofiLoop());
+                musicSource.clip = Synth("cozy", () => AsmrSynth.CozyTune());
                 musicSource.Play();
             }
         }
 
         void Update()
         {
-            // duck recovery: ~0.7 s release back to full music level
-            duck = Mathf.MoveTowards(duck, 0f, Time.deltaTime / 0.7f);
+            // duck recovery: ~0.9 s release back to full music level
+            duck = Mathf.MoveTowards(duck, 0f, Time.deltaTime / 0.9f);
             ApplyMusicVol();
         }
 
         void ApplyMusicVol()
         {
-            // -4 dB while ducked (x0.63), smooth via the Update lerp
-            if (musicSource) musicSource.volume = MusicVolume * Mathf.Lerp(1f, 0.63f, duck);
+            // -6 dB while ducked (x0.5), smooth via the Update lerp
+            if (musicSource) musicSource.volume = MusicVolume * Mathf.Lerp(1f, 0.5f, duck);
         }
 
         // ------------------------------------------------- public API
@@ -92,10 +92,10 @@ namespace Crunchee.Audio
             // Landing: squish first, crack a beat later and louder.
             int dv = Random.Range(0, 3);
             var deep = self.Synth($"squishdeep{dv}", () => AsmrSynth.SquishStep(dv * 31 + 5, true));
-            self.Voice("squish", deep, Random.Range(0.95f, 1.03f), 0.5f);
+            self.Voice("squish", deep, Random.Range(0.95f, 1.03f), 0.7f);
             var baseClip = self.FromTable(self.baseClips, (int)b)
                            ?? self.Synth($"base{(int)b}_{dv}", () => AsmrSynth.BaseFor(b, dv * 17 + 3));
-            self.Voice("base", baseClip, Random.Range(0.94f, 1.02f), 0.45f);
+            self.Voice("base", baseClip, Random.Range(0.94f, 1.02f), 0.6f);
 
             if (c == Coating.Plain) return;
 
@@ -108,7 +108,7 @@ namespace Crunchee.Audio
                 float f = (layers - 1) / 9f;
                 self.StartCoroutine(self.DelayedVoice(clip,
                              Mathf.Lerp(1.03f, 0.88f, f) * Random.Range(0.98f, 1.02f),
-                             Mathf.Lerp(0.85f, 1f, f), 0.07f, true));
+                             1f, 0.07f, true));
             }
             else
             {
@@ -123,7 +123,7 @@ namespace Crunchee.Audio
             if (Instance == null) return;
             int v = Random.Range(0, 3);
             var clip = Instance.Synth($"squishstep{v}", () => AsmrSynth.SquishStep(v * 7 + 1));
-            Instance.Voice("step", clip, Random.Range(0.92f, 1f), 0.14f);
+            Instance.Voice("step", clip, Random.Range(0.92f, 1f), 0.3f);
         }
 
         /// <summary>
@@ -138,15 +138,15 @@ namespace Crunchee.Audio
             var self = Instance;
             int v = Random.Range(0, 3);
             var squish = self.Synth($"squishstep{v}", () => AsmrSynth.SquishStep(v * 7 + 1));
-            self.Voice("step", squish, Random.Range(0.95f, 1.08f), 0.14f);
+            self.Voice("step", squish, Random.Range(0.95f, 1.08f), 0.3f);
 
             if (c == Coating.Wax && waxLayers > 0) // every step cracks
             {
                 int cv = Random.Range(0, 4);
                 var crack = self.Synth($"waxstep{waxLayers}_{cv}", () => AsmrSynth.WaxStepCrack(waxLayers, cv * 13 + waxLayers));
-                float settle = Mathf.Lerp(1f, 0.6f, Mathf.Clamp01(walkedSteps / 14f)); // eases, never silent
+                float settle = Mathf.Lerp(1f, 0.75f, Mathf.Clamp01(walkedSteps / 14f)); // eases, never silent
                 self.Voice("stepcrack", crack, Random.Range(0.94f, 1.06f),
-                           (0.28f + 0.05f * Mathf.Clamp(waxLayers, 1, 10)) * settle);
+                           (0.55f + 0.04f * Mathf.Clamp(waxLayers, 1, 10)) * settle);
             }
         }
 
@@ -180,11 +180,14 @@ namespace Crunchee.Audio
         }
 
         /// <summary>One shot on its OWN pooled voice (pitch set before play,
-        /// so nothing already sounding is bent). Rate-limited per type.</summary>
+        /// so nothing already sounding is bent). Rate-limited per type:
+        /// stepcrack gets 0.2 s so the longer step crackles overlap into a
+        /// continuous crackle while walking, everything else 0.09 s.</summary>
         void Voice(string type, AudioClip clip, float pitch, float volume)
         {
             if (clip == null) return;
-            if (lastPlay.TryGetValue(type, out float t) && Time.time - t < 0.09f) return;
+            float minGap = type == "stepcrack" ? 0.2f : 0.09f;
+            if (lastPlay.TryGetValue(type, out float t) && Time.time - t < minGap) return;
             lastPlay[type] = Time.time;
             var s = pool[nextVoice]; nextVoice = (nextVoice + 1) % Voices;
             s.pitch = pitch;
