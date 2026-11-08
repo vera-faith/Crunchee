@@ -158,33 +158,43 @@ namespace Crunchee.EditorTools
                 // Big wide lop ears (v12b): ~60 deg from vertical, sticking
                 // out to the sides and drooping, clearly two ears from the
                 // behind/above gameplay camera.
-                var axis = new Vector3(side * 1.05f, -0.6f, 0f).normalized;
-                var thin = (Vector3.forward - axis * Vector3.Dot(axis, Vector3.forward)).normalized;
-                var earRot = Quaternion.LookRotation(thin, axis); // local y -> ear axis, local z -> thickness
+                var rootDir = new Vector3(side * 0.92f, -0.28f, 0f).normalized;
+                var midDir = new Vector3(side * 0.72f, -0.7f, 0f).normalized;
+                var tipDir = new Vector3(side * 0.24f, -0.97f, 0f).normalized;
+                Quaternion EarRotation(Vector3 dir)
+                {
+                    var forward = (Vector3.forward - dir * Vector3.Dot(dir, Vector3.forward)).normalized;
+                    return Quaternion.LookRotation(forward, dir);
+                }
                 float EarSd(Vector3 p)
                 {
-                    float root = SdfMesher.Ellipsoid(p, axis * 0.12f, new Vector3(0.17f, 0.20f, 0.08f), earRot);
-                    float mid = SdfMesher.Ellipsoid(p, axis * 0.50f, new Vector3(0.27f, 0.27f, 0.09f), earRot);
-                    float tip = SdfMesher.Ellipsoid(p, axis * 0.85f, new Vector3(0.22f, 0.21f, 0.10f), earRot);
-                    return SdfMesher.Smin(SdfMesher.Smin(root, mid, 0.08f), tip, 0.08f);
+                    float root = SdfMesher.Ellipsoid(p, new Vector3(side * 0.10f, 0f, 0f), new Vector3(0.16f, 0.20f, 0.075f), EarRotation(rootDir));
+                    float upper = SdfMesher.Ellipsoid(p, new Vector3(side * 0.34f, -0.07f, 0f), new Vector3(0.23f, 0.27f, 0.085f), EarRotation(rootDir));
+                    float mid = SdfMesher.Ellipsoid(p, new Vector3(side * 0.62f, -0.30f, 0.01f), new Vector3(0.25f, 0.29f, 0.09f), EarRotation(midDir));
+                    float lower = SdfMesher.Ellipsoid(p, new Vector3(side * 0.77f, -0.62f, 0.02f), new Vector3(0.22f, 0.26f, 0.09f), EarRotation(tipDir));
+                    float tip = SdfMesher.Ellipsoid(p, new Vector3(side * 0.80f, -0.86f, 0.02f), new Vector3(0.17f, 0.18f, 0.085f), EarRotation(tipDir));
+                    float d = SdfMesher.Smin(root, upper, 0.075f);
+                    d = SdfMesher.Smin(d, mid, 0.075f);
+                    d = SdfMesher.Smin(d, lower, 0.07f);
+                    return SdfMesher.Smin(d, tip, 0.065f);
                 }
                 SdfMesher.Field earF = p => EarSd(p);
                 SdfMesher.Field earCoatF = p =>
                 {
                     // Solid honey glaze over the half nearer the head + a drip.
-                    float along = Vector3.Dot(p, axis);
-                    float f = SdfMesher.Smax(EarSd(p) - 0.028f, along - 0.5f, 0.05f);
-                    float drip = SdfMesher.Capsule(p, axis * 0.45f, axis * 0.64f, 0.055f);
+                    float along = Vector3.Dot(p, new Vector3(side * 0.9f, -0.35f, 0f).normalized);
+                    float f = SdfMesher.Smax(EarSd(p) - 0.024f, along - 0.50f, 0.05f);
+                    float drip = SdfMesher.Capsule(p, new Vector3(side * 0.47f, -0.16f, -0.055f), new Vector3(side * 0.57f, -0.40f, -0.055f), 0.045f);
                     return SdfMesher.Smin(f, drip, 0.03f);
                 };
                 // bounds must cover the OUTWARD direction per side - the
                 // left ear reaches -x, so a +x-only box clipped it to a nub.
-                var bmin = new Vector3(side > 0f ? -0.25f : -1.15f, -0.85f, -0.35f);
+                var bmin = new Vector3(side > 0f ? -0.25f : -1.15f, -1.15f, -0.35f);
                 var bmax = new Vector3(side > 0f ? 1.15f : 0.25f, 0.3f, 0.35f);
-                var em = SdfMesher.Build(earF, bmin, bmax, 48);
+                var em = SdfMesher.Build(earF, bmin, bmax, 56);
                 em.name = $"BunnyEar{sfx}";
                 MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
-                var cm = SdfMesher.Build(earCoatF, bmin, bmax, 40);
+                var cm = SdfMesher.Build(earCoatF, bmin, bmax, 48);
                 cm.name = $"BunnyEarCaramel{sfx}";
                 MeshPart(pt, "EarCaramel", SaveMesh(cm, $"BunnyEarCaramel{sfx}"), honey);
             }
