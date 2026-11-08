@@ -24,24 +24,27 @@ namespace Crunchee.EditorTools
         {
             // Cream/golden jelly (the whole skin), deep amber caramel glaze,
             // lighter honey for the thin coats.
-            var cream = Mat("Cream", new Color(1f, 0.88f, 0.73f), 1f, 0.95f); // warm cream, not lemon
+            var cream = Mat("Cream", new Color(0.94f, 0.82f, 0.68f), 1f, 0.95f); // warm cream, not lemon
             cream.EnableKeyword("_EMISSION");
-            cream.SetColor("_EmissionColor", new Color(0.05f, 0.035f, 0.02f)); // faint jelly glow so the face never goes grey
-            cream.SetFloat("_RimStrength", 0.15f);
+            cream.SetColor("_EmissionColor", new Color(0.025f, 0.018f, 0.012f)); // faint jelly glow so the face never goes grey
+            cream.SetFloat("_RimStrength", 0.12f);
             cream.SetColor("_RimColor", new Color(1f, 0.88f, 0.72f));
+            cream.SetFloat("_EnvStrength", 0.65f);
             // Deep toffee amber (it renders HOT - warm lights + rim emission +
             // gain push it to orange; the base must be darker and cooler and
             // the rim nearly gone so on-screen mids stay caramel-brown).
-            var caramel = Mat("Caramel", new Color(0.5f, 0.27f, 0.09f), 1f, 1f);
+            var caramel = Mat("Caramel", new Color(0.38f, 0.24f, 0.145f), 1f, 1f);
             caramel.SetFloat("_SpecStrength", 1.6f);
-            caramel.SetFloat("_RimStrength", 0.06f);
-            caramel.SetColor("_RimColor", new Color(1f, 0.82f, 0.55f));
-            var honey = Mat("CaramelHoney", new Color(0.84f, 0.56f, 0.26f), 1f, 1f);
+            caramel.SetFloat("_RimStrength", 0.04f);
+            caramel.SetColor("_RimColor", new Color(0.75f, 0.48f, 0.28f));
+            caramel.SetFloat("_EnvStrength", 0.35f);
+            var honey = Mat("CaramelHoney", new Color(0.55f, 0.35f, 0.20f), 1f, 1f);
             honey.SetFloat("_SpecStrength", 1.6f);
-            honey.SetFloat("_RimStrength", 0.15f);
-            var eyeM = Mat("EyeDark", new Color(0.12f, 0.06f, 0.03f), 1f, 1f);
+            honey.SetFloat("_RimStrength", 0.08f);
+            honey.SetFloat("_EnvStrength", 0.45f);
+            var eyeM = Mat("EyeDark", new Color(0.055f, 0.022f, 0.014f), 1f, 1f);
             eyeM.SetFloat("_SpecStrength", 2.2f);
-            var irisM = Mat("EyeIris", new Color(0.36f, 0.18f, 0.07f), 1f, 1f);
+            var irisM = Mat("EyeIris", new Color(0.18f, 0.075f, 0.032f), 1f, 1f);
             var shineM = EmissiveMat("EyeShine", Color.white, 0.6f);
             var blushM = Mat("Blush", new Color(1f, 0.55f, 0.62f), 0.6f, 0.4f);
             NoSheen(blushM);
