@@ -156,6 +156,7 @@ namespace Crunchee.Player
         bool jumpQueued;
         bool JumpPressed()
         {
+            if (SettingsMenu.IsOpen) { jumpQueued = false; return false; } // menu eats input
             bool uiJump = MobileControls.Instance != null && MobileControls.Instance.ConsumeJump();
             bool j = jumpQueued || uiJump || Input.GetKeyDown(KeyCode.Space);
             jumpQueued = false; return j;
@@ -164,6 +165,8 @@ namespace Crunchee.Player
         void ReadInput()
         {
             dragInput = Vector2.zero;
+            if (SettingsMenu.IsOpen) { jumpQueued = false; return; } // menu eats input
+
             // On-screen joystick wins when present (real device build)
             if (MobileControls.Instance != null && MobileControls.Instance.Move.sqrMagnitude > 0.001f)
             {
