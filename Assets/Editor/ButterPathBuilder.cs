@@ -243,10 +243,13 @@ namespace Crunchee.EditorTools
         [MenuItem("Crunchee/Build iOS (Xcode project)")]
         public static void BuildIOS()
         {
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/ButterPath.unity", true) };
+            var scenePaths = Crunchee.Game.MapCatalog.AvailableScenePaths();
+            EditorBuildSettings.scenes = new EditorBuildSettingsScene[scenePaths.Length];
+            for (int i = 0; i < scenePaths.Length; i++)
+                EditorBuildSettings.scenes[i] = new EditorBuildSettingsScene(scenePaths[i], true);
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { "Assets/Scenes/ButterPath.unity" },
+                scenes = scenePaths,
                 locationPathName = "Builds/iOS",
                 target = BuildTarget.iOS,
                 options = BuildOptions.None,
