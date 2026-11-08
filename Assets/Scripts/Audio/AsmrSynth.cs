@@ -398,17 +398,22 @@ namespace Crunchee.Audio
             }
         }
 
-        /// <summary>Soft kalimba/celesta note: low register, mellow partials.</summary>
-        static void AddPluck(float[] buf, float midi, double start, float amp)
+        /// <summary>Soft felt-piano note: a gentle ~12 ms attack, a long
+        /// mellow ~2.5 s decay, quiet close partials and a slightly detuned
+        /// partner for warmth - rounder and calmer than a music-box voice,
+        /// no metallic ding.</summary>
+        static void AddFeltNote(float[] buf, float midi, double start, float amp)
         {
-            int n = buf.Length, count = (int)(2.2 * SR);
+            int n = buf.Length, count = (int)(2.6 * SR);
             double f = MidiHz(midi);
             for (int i = 0; i < count; i++)
             {
                 double t = i / (double)SR;
-                double env = System.Math.Exp(-t * 2.6) * System.Math.Min(1.0, t / 0.006);
+                double env = System.Math.Exp(-t * 1.9) * System.Math.Min(1.0, t / 0.012);
                 double v = (System.Math.Sin(2 * System.Math.PI * f * t)
-                          + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 2.01 * t)) * env * amp;
+                          + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 1.003 * t)
+                          + 0.22 * System.Math.Sin(2 * System.Math.PI * f * 2.01 * t)
+                          + 0.07 * System.Math.Sin(2 * System.Math.PI * f * 3.02 * t)) * env * amp;
                 buf[((int)(start * SR) + i) % n] += (float)v;
             }
         }
@@ -426,40 +431,49 @@ namespace Crunchee.Audio
         }
 
         /// <summary>
-        /// Soft dreamy ambient bed (replaces the bright music box): ~62 BPM
-        /// feel, warm low-passed pads breathing over a gentle bass, sparse
-        /// low-register kalimba notes - no twinkles. 44 s, seamless loop,
-        /// ORIGINAL composition. Cmaj7-Am7-Fmaj7-Gsus, calm and far away.
+        /// Cute lullaby loop - an actual composed piece, not scale runs:
+        /// an 8-bar Pachelbel-flavoured progression in C (I-V-vi-iii-IV-I-ii-V)
+        /// with warm breathing pads and a soft bass under a felt-piano melody
+        /// that sings in two gentle arches (up then home, then up higher and
+        /// home) and rests at the seam so the loop breathes. ~70 BPM, ~27 s,
+        /// seamless loop, ORIGINAL composition, sits quietly under the ASMR.
         /// </summary>
-        public static AudioClip DreamyAmbient()
+        public static AudioClip CuteLullaby()
         {
-            const double bar = 3.85;                  // ~62 bpm, 4 beats of 0.96 s
-            const int bars = 11;
-            var buf = new float[(int)(bar * bars * SR)];   // ~42 s loop
+            const double bar = 3.4;                   // ~70 bpm, 4 beats of 0.85 s
+            const int bars = 8;
+            var buf = new float[(int)(bar * bars * SR)];   // ~27 s loop
             float[][] chords =
             {
-                new float[] { 48, 55, 59, 64 }, // Cmaj7
-                new float[] { 45, 52, 57, 60 }, // Am7
-                new float[] { 41, 48, 52, 57 }, // Fmaj7
-                new float[] { 43, 50, 55, 59 }, // G add9-ish
+                new float[] { 48, 55, 64, 67 }, // C
+                new float[] { 55, 59, 62, 67 }, // G
+                new float[] { 45, 52, 60, 64 }, // Am
+                new float[] { 52, 59, 64, 67 }, // Em
+                new float[] { 53, 60, 65, 69 }, // F
+                new float[] { 48, 55, 64, 67 }, // C
+                new float[] { 50, 57, 62, 65 }, // Dm
+                new float[] { 55, 59, 62, 67 }, // G
             };
-            float[] roots = { 36, 33, 29, 31 };
+            float[] roots = { 36, 43, 45, 40, 41, 36, 38, 43 }; // C G A E F C D G
             for (int b = 0; b < bars; b++)
             {
-                var ch = chords[b % 4];
                 double at = b * bar;
-                foreach (var tone in ch) AddPadVoice(buf, tone, at, bar + 1.2, 900f);
-                AddBass(buf, roots[b % 4], at + 0.2, bar - 0.4);
+                foreach (var tone in chords[b]) AddPadVoice(buf, tone, at, bar + 1.4, 800f);
+                AddBass(buf, roots[b], at + 0.1, bar - 0.3);
             }
-            // sparse kalimba: a few notes every other bar, mid-low register
-            var notes = new (int bar, double beat, float midi)[]
+            var melody = new (int bar, double beat, float midi)[]
             {
-                (0, 2.0, 64), (1, 1.0, 60), (1, 3.2, 67), (2, 0.5, 59), (3, 2.4, 64),
-                (4, 1.2, 57), (5, 3.0, 60), (6, 0.8, 64), (7, 2.0, 55), (8, 1.5, 60),
-                (9, 3.0, 64), (10, 1.0, 57),
+                (0, 0.0, 76), (0, 2.0, 79),   // E5 G5  - phrase A rises
+                (1, 0.0, 74), (1, 2.0, 71),   // D5 B4
+                (2, 0.0, 72), (2, 2.0, 76),   // C5 E5
+                (3, 0.0, 71), (3, 2.0, 67),   // B4 G4  - settles home low
+                (4, 0.0, 69), (4, 2.0, 72),   // A4 C5  - phrase A' opens low
+                (5, 0.0, 67), (5, 2.0, 76),   // G4 E5  - leaps up high
+                (6, 0.0, 77), (6, 2.0, 74),   // F5 D5  - crest then falls
+                (7, 0.0, 71), (7, 2.0, 67),   // B4 G4  - rests into the seam
             };
-            foreach (var (b, bt, m) in notes) AddPluck(buf, m, b * bar + bt * 0.96, 0.12f);
-            return ToClip("Synth_DreamyAmbient", buf, 0.5f); // sits under the ASMR
+            foreach (var (b, bt, m) in melody) AddFeltNote(buf, m, b * bar + bt * 0.85, 0.11f);
+            return ToClip("Synth_Lullaby", buf, 0.42f); // a touch deeper under the ASMR
         }
     }
 }

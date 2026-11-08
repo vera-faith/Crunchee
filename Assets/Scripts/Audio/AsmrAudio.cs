@@ -64,7 +64,7 @@ namespace Crunchee.Audio
         {
             if (musicSource.clip == null)
             {
-                musicSource.clip = Synth("ambient", () => AsmrSynth.DreamyAmbient());
+                musicSource.clip = Synth("lullaby", () => AsmrSynth.CuteLullaby());
                 musicSource.Play();
             }
         }
