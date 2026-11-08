@@ -4,13 +4,15 @@ using Crunchee.Core;
 namespace Crunchee.Audio
 {
     /// <summary>
-    /// Original procedural ASMR synthesis (redesign, Nov 6): fewer, more
-    /// coherent sounds. A crack is ONE fracture event - a sharp band-limited
-    /// transient plus a short modal ring, then a clustered cascade of
-    /// secondary fractures and a tiny settle - not scattered ticks. Every
-    /// base material has its own character; wax layers 1..10 morph
-    /// continuously from thin glassy tick-snaps to deep chunky crunches.
-    /// All filtered noise (one-pole LP/HP bands) - never raw first-difference.
+    /// Original procedural ASMR synthesis. A crack is a clustered burst of
+    /// micro-fractures - one sharp onset transient plus a modal ring, then
+    /// 6-12 secondary crackles spread over ~0.15-0.45 s with falling
+    /// amplitude, then a tiny settle (matched to the ASMR reference: every
+    /// footstep on wax reads as a small crackle cluster, a full landing as a
+    /// dense broadband crunch). Every base material has its own character;
+    /// wax layers 1..10 morph continuously from thin glassy tick-snaps to
+    /// deep chunky crunches. All filtered noise (one-pole LP/HP bands) -
+    /// never raw first-difference.
     /// </summary>
     public static class AsmrSynth
     {
@@ -79,65 +81,100 @@ namespace Crunchee.Audio
         // ============================== AU2: coherent wax crack ============
 
         /// <summary>
-        /// ONE fracture event for layer n: sharp band-limited transient +
-        /// modal ring (thin bright ~3-6 kHz at n=1, heavy ~0.9-2.5 kHz plus a
-        /// 90-150 Hz body thump at n=10), then 3-7 clustered secondary
-        /// fractures with falling amplitude, then a short settle. Deterministic.
+        /// ONE landing fracture for layer n, matched to the reference: a sharp
+        /// broadband onset transient + modal ring, then a dense cascade of
+        /// 6-12 secondary crackles spread over ~0.15-0.45 s (longer the
+        /// thicker the wax) with falling amplitude and per-crackle band
+        /// jitter so no two snaps sound identical, then a short settle.
+        /// Thin wax (n=1) reads bright and glassy ~3-6 kHz; thick wax (n=10)
+        /// reaches down to a 90-150 Hz body thump and keeps crackle energy
+        /// flat out past 10 kHz. Deterministic.
         /// </summary>
         public static AudioClip WaxCrack(int layers, int seed)
         {
             layers = Mathf.Clamp(layers, 1, 10);
             var r = new System.Random(seed * 104729 + layers * 131);
             float f = (layers - 1) / 9f;                       // 0 thin .. 1 thick
-            float dur = Mathf.Lerp(0.14f, 0.42f, f) + 0.08f;
+            float dur = Mathf.Lerp(0.2f, 0.52f, f) + 0.08f;
             var d = NewBuf(dur);
             // ring frequencies fall as the shell gets heavier
             float fA = Mathf.Lerp(5200f, 2200f, f) * (0.96f + (float)r.NextDouble() * 0.08f);
             float fB = fA * (1.31f + (float)r.NextDouble() * 0.2f);
             float ringDecay = Mathf.Lerp(120f, 45f, f);        // thin rings die fast
             // the initial transient: one sharp click in the ring band
-            BandNoise(d, 0, (int)Mathf.Lerp(900f, 2400f, f), Mathf.Lerp(2600f, 900f, f), Mathf.Lerp(8000f, 4000f, f), 1f, Mathf.Lerp(60f, 18f, f) * 40f, r);
+            BandNoise(d, 0, (int)Mathf.Lerp(900f, 2600f, f), Mathf.Lerp(1500f, 600f, f), Mathf.Lerp(9500f, 4500f, f), 1f, Mathf.Lerp(60f, 16f, f) * 40f, r);
             AddRing(d, 0, fA, 0.55f, ringDecay, Mathf.Lerp(0.05f, 0.16f, f));
             AddRing(d, 0, fB, 0.3f, ringDecay * 1.4f, Mathf.Lerp(0.04f, 0.13f, f));
-            if (f > 0.4f) AddThump(d, 0, Mathf.Lerp(150f, 95f, f), Mathf.Lerp(0f, 0.5f, (f - 0.4f) / 0.6f), 0.12f);
-            // secondary fractures: clustered, falling off
-            int n2 = Mathf.RoundToInt(Mathf.Lerp(3f, 7f, f));
-            float at = 0.008f;
+            if (f > 0.4f) AddThump(d, 0, Mathf.Lerp(150f, 95f, f), Mathf.Lerp(0f, 0.42f, (f - 0.4f) / 0.6f), 0.12f);
+            // secondary fractures: a dense jittered cascade, falling off.
+            // Reference bursts carry 8-13 crackles over ~0.3-0.45 s.
+            int n2 = Mathf.RoundToInt(Mathf.Lerp(6f, 12f, f));
+            float at = 0.006f;
             for (int s = 0; s < n2; s++)
             {
                 int st = (int)(at * SR);
-                float a = Mathf.Lerp(0.5f, 0.16f, s / (float)n2) * (0.8f + (float)r.NextDouble() * 0.3f);
-                BandNoise(d, st, (int)Mathf.Lerp(600f, 1800f, f), Mathf.Lerp(2000f, 700f, f), Mathf.Lerp(7000f, 3000f, f), a, Mathf.Lerp(55f, 14f, f) * 40f, r);
+                float a = Mathf.Lerp(0.55f, 0.14f, s / (float)n2) * (0.75f + (float)r.NextDouble() * 0.35f);
+                // band jitters per crackle: thin wax stays bright, thick wax
+                // sweeps lower with more spread, both keep >6 kHz sparkle.
+                float j = (float)r.NextDouble();
+                float lo = Mathf.Lerp(1400f, 500f, f) * Mathf.Lerp(0.85f, 1.3f, j);
+                float hi = Mathf.Lerp(9000f, 4200f, f) * Mathf.Lerp(1.0f, 1.35f, j);
+                BandNoise(d, st, (int)Mathf.Lerp(500f, 1400f, f), lo, hi, a, Mathf.Lerp(55f, 13f, f) * 40f, r);
                 AddRing(d, st, fA * (0.85f + (float)r.NextDouble() * 0.3f), a * 0.4f, ringDecay * 1.6f, 0.05f);
-                at += Mathf.Lerp(0.006f, 0.02f, f) * (0.5f + (float)r.NextDouble());
+                at += Mathf.Lerp(0.012f, 0.035f, f) * (0.4f + (float)r.NextDouble());
             }
             // tiny settle: a short soft grain wash
-            BandNoise(d, (int)(at * SR), (int)(0.05f * SR), 1500f, 5000f, 0.08f, 30f, r);
+            BandNoise(d, (int)(at * SR), (int)(0.06f * SR), 1500f, 6000f, 0.1f, 30f, r);
             return ToClip($"Synth_Wax_{layers}", d, 0.92f);
         }
 
-        /// <summary>Small single crackle for walking on cracked wax.</summary>
+        /// <summary>
+        /// One footstep on cracked wax: a SMALL crackle cluster, not a single
+        /// tick - 3-6 micro-fractures over ~40-130 ms, brightest at thin wax,
+        /// chunkier and slightly longer as layers stack. Every step crackles.
+        /// </summary>
         public static AudioClip WaxStepCrack(int layers, int seed)
         {
             layers = Mathf.Clamp(layers, 1, 10);
             var r = new System.Random(seed * 31337 + layers * 71);
             float f = (layers - 1) / 9f;
-            var d = NewBuf(0.16f);
-            BandNoise(d, 0, (int)Mathf.Lerp(700f, 1600f, f), Mathf.Lerp(2400f, 900f, f), Mathf.Lerp(7500f, 3500f, f), 0.8f, Mathf.Lerp(55f, 20f, f) * 40f, r);
-            AddRing(d, 0, Mathf.Lerp(4200f, 1600f, f), 0.3f, Mathf.Lerp(110f, 50f, f), 0.05f);
-            int st = (int)((0.01f + r.NextDouble() * 0.02f) * SR);
-            BandNoise(d, st, 700, 1800f, 6500f, 0.3f, 2200f, r); // one trailing snap
-            return ToClip("Synth_WaxStep", d, 0.55f);
+            var d = NewBuf(Mathf.Lerp(0.14f, 0.24f, f));
+            int n = Mathf.RoundToInt(Mathf.Lerp(3f, 6f, f));
+            float at = 0f;
+            for (int s = 0; s < n; s++)
+            {
+                float a = Mathf.Lerp(0.9f, 0.3f, s / (float)n) * (0.7f + (float)r.NextDouble() * 0.4f);
+                float j = (float)r.NextDouble();
+                BandNoise(d, (int)(at * SR), (int)Mathf.Lerp(450f, 1200f, f),
+                          Mathf.Lerp(1600f, 700f, f) * Mathf.Lerp(0.9f, 1.25f, j),
+                          Mathf.Lerp(10000f, 4200f, f) * Mathf.Lerp(1.0f, 1.3f, j),
+                          a, Mathf.Lerp(60f, 20f, f) * 40f, r);
+                at += Mathf.Lerp(0.008f, 0.03f, f) * (0.4f + (float)r.NextDouble());
+            }
+            AddRing(d, 0, Mathf.Lerp(4200f, 1600f, f), 0.28f, Mathf.Lerp(110f, 50f, f), 0.05f);
+            return ToClip("Synth_WaxStep", d, 0.6f);
         }
 
         // ============================== AU3: per-material bases ============
 
+        /// <summary>
+        /// Soft squish voice. The gummy character comes from the reference's
+        /// clear signature: a resonant BODY tone ringing ~480-700 Hz that
+        /// pulses with a jelly WOBBLE at ~20-30 Hz decaying over ~0.3 s, plus
+        /// mid-band squelch noise. Energy peaks in the 300-800 Hz band and
+        /// rolls off fast above ~1.5 kHz so it stays chewy, not crispy.
+        /// </summary>
         static float[] SoftSquishBuf(System.Random r, float dur, float f0, float foam,
-                                     float squelchAmt, float thump, float hiss = 0f)
+                                     float squelchAmt, float thump, float hiss = 0f,
+                                     float wobHz = 0f, float wobAmp = 0f,
+                                     float midAmt = 0f, float midLo = 280f, float midHi = 1150f,
+                                     float bodyHz = 0f, float bodyAmp = 0f, float lpGain = 0.6f)
         {
             var d = NewBuf(dur);
-            float lp = 0, lp2 = 0;
-            double ph = 0;
+            float lp = 0, lp2 = 0, mlp = 0, mhp = 0;
+            float aML = Mathf.Exp(-2f * Mathf.PI * midHi / SR);
+            float aMH = Mathf.Exp(-2f * Mathf.PI * midLo / SR);
+            double ph = 0, ph2 = 0;
             for (int i = 0; i < d.Length; i++)
             {
                 float t = i / (float)SR, x = t / dur;

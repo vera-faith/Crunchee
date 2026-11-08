@@ -127,9 +127,10 @@ namespace Crunchee.Audio
         }
 
         /// <summary>
-        /// One footstep on a squishy: soft material squish only, quiet. A
-        /// small wax crackle at most ~1 step in 3, quieter, fading the more
-        /// she has already walked on this squishy. Rate-limited per type.
+        /// One footstep on a squishy: the soft gummy squish, and on wax a
+        /// small crackle cluster EVERY step (the reference cracks under each
+        /// footfall). The crackle settles a little the longer she walks the
+        /// same shell but never goes silent. Rate-limited per type.
         /// </summary>
         public static void PlayStep(Vector3 pos, BaseMaterial b, Coating c, int waxLayers, int walkedSteps = 0)
         {
@@ -137,15 +138,15 @@ namespace Crunchee.Audio
             var self = Instance;
             int v = Random.Range(0, 3);
             var squish = self.Synth($"squishstep{v}", () => AsmrSynth.SquishStep(v * 7 + 1));
-            self.Voice("step", squish, Random.Range(0.95f, 1.08f), 0.12f);
+            self.Voice("step", squish, Random.Range(0.95f, 1.08f), 0.14f);
 
-            if (c == Coating.Wax && waxLayers > 0 && walkedSteps % 3 == 0) // ~1 in 3
+            if (c == Coating.Wax && waxLayers > 0) // every step cracks
             {
                 int cv = Random.Range(0, 4);
                 var crack = self.Synth($"waxstep{waxLayers}_{cv}", () => AsmrSynth.WaxStepCrack(waxLayers, cv * 13 + waxLayers));
-                float fade = Mathf.Clamp01(1f - walkedSteps / 12f);        // fades as she keeps walking
+                float settle = Mathf.Lerp(1f, 0.6f, Mathf.Clamp01(walkedSteps / 14f)); // eases, never silent
                 self.Voice("stepcrack", crack, Random.Range(0.94f, 1.06f),
-                           (0.2f + 0.04f * Mathf.Clamp(waxLayers, 1, 10)) * fade);
+                           (0.28f + 0.05f * Mathf.Clamp(waxLayers, 1, 10)) * settle);
             }
         }
 
