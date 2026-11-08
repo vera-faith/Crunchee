@@ -42,7 +42,7 @@ namespace Crunchee.EditorTools
             W("nailpolish", AsmrSynth.NailPolishTap(1));
             W("squish", AsmrSynth.SquishStep(1));
             W("squishdeep", AsmrSynth.SquishStep(1, true));
-            W("music_lullaby", AsmrSynth.CuteLullaby());
+            W("music_lofi", AsmrSynth.LofiLoop());
             Debug.Log($"[Export] done: {n} wavs -> {dir}");
         }
 

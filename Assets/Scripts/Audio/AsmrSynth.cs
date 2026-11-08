@@ -373,107 +373,205 @@ namespace Crunchee.Audio
                 deep ? 0.6f : 0.35f);
         }
 
-        // ============================== AU6: dreamy ambient bed =============
+        // ============================== AU6: lofi beat bed =================
 
         static float MidiHz(float midi) => 440f * Mathf.Pow(2f, (midi - 69f) / 12f);
 
-        /// <summary>Warm low-passed pad voice: a few detuned sines through a
-        /// soft low-pass with a slow swell/release envelope.</summary>
-        static void AddPadVoice(float[] buf, float midi, double start, double len, float lpCut)
+        /// <summary>Warm electric-piano note: a soft ~12 ms felt attack, a
+        /// long mellow decay, quiet close partials, a slightly detuned
+        /// partner and an optional gentle tremolo for the Rhodes shimmer.
+        /// Round and dusty, no metallic ding.</summary>
+        static void AddKeysNote(float[] buf, float midi, double start, float amp,
+                                float tremHz = 0f)
         {
-            int n = buf.Length;
-            int count = (int)(len * SR);
-            double f = MidiHz(midi);
-            float lp = 0;
-            float a = Mathf.Exp(-2f * Mathf.PI * lpCut / SR);
-            for (int i = 0; i < count; i++)
-            {
-                double t = i / (double)SR, x = t / len;
-                double env = System.Math.Min(1.0, t / 1.4) * (x > 0.6 ? System.Math.Pow(1.0 - (x - 0.6) / 0.4, 1.3) : 1.0);
-                double v = System.Math.Sin(2 * System.Math.PI * f * t) * 0.05
-                         + System.Math.Sin(2 * System.Math.PI * f * 1.003 * t) * 0.025
-                         + System.Math.Sin(2 * System.Math.PI * f * 0.5 * t) * 0.02; // sub octave warmth
-                lp = a * lp + (1f - a) * (float)v;
-                buf[((int)(start * SR) + i) % n] += lp * (float)env;
-            }
-        }
-
-        /// <summary>Soft felt-piano note: a gentle ~12 ms attack, a long
-        /// mellow ~2.5 s decay, quiet close partials and a slightly detuned
-        /// partner for warmth - rounder and calmer than a music-box voice,
-        /// no metallic ding.</summary>
-        static void AddFeltNote(float[] buf, float midi, double start, float amp)
-        {
-            int n = buf.Length, count = (int)(2.6 * SR);
+            int n = buf.Length, count = (int)(2.4 * SR);
             double f = MidiHz(midi);
             for (int i = 0; i < count; i++)
             {
                 double t = i / (double)SR;
-                double env = System.Math.Exp(-t * 1.9) * System.Math.Min(1.0, t / 0.012);
+                double env = System.Math.Exp(-t * 2.1) * System.Math.Min(1.0, t / 0.012);
+                if (tremHz > 0f) env *= 1.0 + 0.13 * System.Math.Sin(2 * System.Math.PI * tremHz * t);
                 double v = (System.Math.Sin(2 * System.Math.PI * f * t)
                           + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 1.003 * t)
-                          + 0.22 * System.Math.Sin(2 * System.Math.PI * f * 2.01 * t)
-                          + 0.07 * System.Math.Sin(2 * System.Math.PI * f * 3.02 * t)) * env * amp;
+                          + 0.2 * System.Math.Sin(2 * System.Math.PI * f * 2.01 * t)
+                          + 0.06 * System.Math.Sin(2 * System.Math.PI * f * 3.02 * t)) * env * amp;
                 buf[((int)(start * SR) + i) % n] += (float)v;
             }
         }
 
-        static void AddBass(float[] buf, float midi, double start, double len)
+        /// <summary>Soft round sub-bass note: quick attack, slow decay, a
+        /// little octave harmonic so it reads on phone speakers.</summary>
+        static void AddBass(float[] buf, float midi, double start, double len, float amp)
         {
             int n = buf.Length, count = (int)(len * SR);
             double f = MidiHz(midi);
             for (int i = 0; i < count; i++)
             {
                 double t = i / (double)SR;
-                double env = System.Math.Min(1.0, t / 0.5) * (t > len - 0.8 ? (len - t) / 0.8 : 1.0);
-                buf[((int)(start * SR) + i) % n] += (float)(System.Math.Sin(2 * System.Math.PI * f * t) * 0.045 * env);
+                double env = System.Math.Min(1.0, t / 0.01) * System.Math.Exp(-t * 2.6);
+                double v = System.Math.Sin(2 * System.Math.PI * f * t)
+                         + 0.3 * System.Math.Sin(2 * System.Math.PI * f * 2 * t);
+                buf[((int)(start * SR) + i) % n] += (float)(v * env * amp);
+            }
+        }
+
+        /// <summary>Boomy lofi kick: a fast sine drop ~110-46 Hz pushed
+        /// through soft saturation so it thumps without a hard click.</summary>
+        static void AddKick(float[] buf, double start, float amp)
+        {
+            int n = buf.Length, count = (int)(0.24 * SR);
+            double ph = 0;
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                double f = 110 * System.Math.Exp(-t * 30) + 46;
+                ph += 2 * System.Math.PI * f / SR;
+                double env = System.Math.Exp(-t * 15) * System.Math.Min(1.0, t / 0.0015);
+                buf[((int)(start * SR) + i) % n] +=
+                    (float)(System.Math.Tanh(System.Math.Sin(ph) * env * amp * 2.2) * 0.55);
+            }
+        }
+
+        /// <summary>Laid-back snare: band-limited noise ~1.3-4.2 kHz over a
+        /// ~190 Hz body - played a hair late for the lofi drag.</summary>
+        static void AddSnare(float[] buf, double start, float amp, System.Random r)
+        {
+            int n = buf.Length, count = (int)(0.17 * SR);
+            float lp = 0, hp = 0;
+            float aL = Mathf.Exp(-2f * Mathf.PI * 4200f / SR);
+            float aH = Mathf.Exp(-2f * Mathf.PI * 1300f / SR);
+            double ph = 0;
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                double env = System.Math.Exp(-t * 28) * System.Math.Min(1.0, t / 0.001);
+                lp = aL * lp + (1f - aL) * Noise(r);
+                hp = aH * hp + (1f - aH) * lp;
+                ph += 2 * System.Math.PI * 190 / SR;
+                buf[((int)(start * SR) + i) % n] += (float)((lp - hp) * env * amp
+                    + System.Math.Sin(ph) * System.Math.Exp(-t * 20) * amp * 0.45);
+            }
+        }
+
+        /// <summary>Swung hat: a short >7.4 kHz tick, or an open sizzle.</summary>
+        static void AddHat(float[] buf, double start, float amp, bool open, System.Random r)
+        {
+            int n = buf.Length, count = (int)((open ? 0.24 : 0.05) * SR);
+            float hp = 0;
+            float aH = Mathf.Exp(-2f * Mathf.PI * 7400f / SR);
+            double decay = open ? 14.0 : 110.0;
+            for (int i = 0; i < count; i++)
+            {
+                double t = i / (double)SR;
+                hp = aH * hp + (1f - aH) * Noise(r);
+                buf[((int)(start * SR) + i) % n] += hp * (float)System.Math.Exp(-t * decay) * amp;
+            }
+        }
+
+        /// <summary>Record texture: a bed of low-passed hiss plus sparse
+        /// pops - dusty, present, never loud.</summary>
+        static void AddVinyl(float[] buf, System.Random r)
+        {
+            int n = buf.Length;
+            float lp = 0;
+            float aL = Mathf.Exp(-2f * Mathf.PI * 2600f / SR);
+            for (int i = 0; i < n; i++)
+            {
+                lp = aL * lp + (1f - aL) * Noise(r);
+                buf[i] += lp * 0.013f;
+            }
+            for (int p = 0; p < 30; p++)
+            {
+                int st = (int)(r.NextDouble() * (n - 64));
+                float a = 0.015f + (float)r.NextDouble() * 0.035f;
+                for (int i = 0; i < 48; i++)
+                    buf[st + i] += Noise(r) * a * Mathf.Exp(-i * 0.22f);
             }
         }
 
         /// <summary>
-        /// Cute lullaby loop - an actual composed piece, not scale runs:
-        /// an 8-bar Pachelbel-flavoured progression in C (I-V-vi-iii-IV-I-ii-V)
-        /// with warm breathing pads and a soft bass under a felt-piano melody
-        /// that sings in two gentle arches (up then home, then up higher and
-        /// home) and rests at the seam so the loop breathes. ~70 BPM, ~27 s,
-        /// seamless loop, ORIGINAL composition, sits quietly under the ASMR.
+        /// Lofi beat loop - an original chill-hop groove: the classic
+        /// I-vi-ii-V turnaround in C dressed as jazz extensions
+        /// (Cmaj9 - Am9 - Dm9 - G13, twice around) on warm electric-piano
+        /// stabs with a bounced re-hit, a hopping sub-bass, boom-bap kicks,
+        /// snares dragged a hair late, swung hats with human timing jitter,
+        /// and a dusty vinyl bed. The felt-keys hook sings a little
+        /// question-and-answer over it and rests at the seam so the V into
+        /// the wrap-around I keeps it circling forever. ~78 BPM, ~25 s,
+        /// seamless, ORIGINAL composition, sits quietly under the ASMR.
         /// </summary>
-        public static AudioClip CuteLullaby()
+        public static AudioClip LofiLoop()
         {
-            const double bar = 3.4;                   // ~70 bpm, 4 beats of 0.85 s
+            var r = new System.Random(4242);
+            const double beat = 60.0 / 78.0;             // 78 bpm
+            const double bar = beat * 4;
             const int bars = 8;
-            var buf = new float[(int)(bar * bars * SR)];   // ~27 s loop
+            var buf = new float[(int)(bar * bars * SR)]; // ~24.6 s loop
+            const double swing = 0.13 * beat;            // offbeats drag ~62/38
+            double Jit() => (r.NextDouble() * 2 - 1) * 0.014;
+
+            // jazzy rootless voicings - the bass owns the roots
             float[][] chords =
             {
-                new float[] { 48, 55, 64, 67 }, // C
-                new float[] { 55, 59, 62, 67 }, // G
-                new float[] { 45, 52, 60, 64 }, // Am
-                new float[] { 52, 59, 64, 67 }, // Em
-                new float[] { 53, 60, 65, 69 }, // F
-                new float[] { 48, 55, 64, 67 }, // C
-                new float[] { 50, 57, 62, 65 }, // Dm
-                new float[] { 55, 59, 62, 67 }, // G
+                new float[] { 64, 67, 71, 74 }, // Cmaj9: E G B D
+                new float[] { 67, 71, 72, 76 }, // Am9:   G B C E
+                new float[] { 65, 69, 72, 76 }, // Dm9:   F A C E
+                new float[] { 65, 69, 71, 76 }, // G13:   F A B E
             };
-            float[] roots = { 36, 43, 45, 40, 41, 36, 38, 43 }; // C G A E F C D G
+            float[] roots = { 36, 33, 38, 31 };          // C2 A1 D2 G1
+
             for (int b = 0; b < bars; b++)
             {
+                int c = b % 4;
                 double at = b * bar;
-                foreach (var tone in chords[b]) AddPadVoice(buf, tone, at, bar + 1.4, 800f);
-                AddBass(buf, roots[b], at + 0.1, bar - 0.3);
+                // electric-piano stab: slight strum, plus a bounced second
+                // stab on the "and" of 3 every other bar
+                for (int k = 0; k < chords[c].Length; k++)
+                {
+                    AddKeysNote(buf, chords[c][k], at + k * 0.009 + Jit(), 0.1f, 4.2f);
+                    if (b % 2 == 1)
+                        AddKeysNote(buf, chords[c][k],
+                                    at + beat * 2.5 + swing + k * 0.009 + Jit(), 0.05f, 4.2f);
+                }
+                // bass: root on beat 1, octave-up hop on the "and" of 3
+                AddBass(buf, roots[c], at + 0.05 + Jit(), beat * 1.7, 0.16f);
+                AddBass(buf, roots[c] + 12, at + beat * 2.5 + swing + Jit(), beat * 0.55, 0.1f);
+                // boom-bap: kick on 1 and the "and" of 3, snares on 2 & 4 late
+                AddKick(buf, at + Jit(), 0.32f);
+                AddKick(buf, at + beat * 2.5 + swing + Jit(), 0.24f);
+                if (c == 3) AddKick(buf, at + beat * 1.5 + swing + Jit(), 0.2f);
+                AddSnare(buf, at + beat + 0.02 + Jit(), 0.22f, r);
+                AddSnare(buf, at + beat * 3 + 0.028 + Jit(), 0.2f, r);
+                // swung hats, alternating emphasis with velocity variation
+                for (int j = 0; j < 8; j++)
+                {
+                    bool off = j % 2 == 1;
+                    double ht = at + beat * j / 2 + (off ? swing : 0) + Jit();
+                    AddHat(buf, ht, (off ? 0.028f : 0.045f) * (0.85f + (float)r.NextDouble() * 0.3f), false, r);
+                }
+                if (c == 3) AddHat(buf, at + beat * 3.5 + swing + Jit(), 0.05f, true, r);
             }
+
+            // cute felt-keys hook: a question-and-answer that rests at the seam
             var melody = new (int bar, double beat, float midi)[]
             {
-                (0, 0.0, 76), (0, 2.0, 79),   // E5 G5  - phrase A rises
-                (1, 0.0, 74), (1, 2.0, 71),   // D5 B4
-                (2, 0.0, 72), (2, 2.0, 76),   // C5 E5
-                (3, 0.0, 71), (3, 2.0, 67),   // B4 G4  - settles home low
-                (4, 0.0, 69), (4, 2.0, 72),   // A4 C5  - phrase A' opens low
-                (5, 0.0, 67), (5, 2.0, 76),   // G4 E5  - leaps up high
-                (6, 0.0, 77), (6, 2.0, 74),   // F5 D5  - crest then falls
-                (7, 0.0, 71), (7, 2.0, 67),   // B4 G4  - rests into the seam
+                (0, 0.0, 76), (0, 1.5, 79), (0, 2.5, 81), (0, 3.5, 79), // E G A G - hops up and down
+                (1, 0.0, 76), (1, 3.0, 74), (1, 3.75, 76),              // E ... D E
+                (2, 0.0, 77), (2, 1.5, 76), (2, 2.5, 74), (2, 3.5, 72), // F E D C - tumbles home
+                (3, 0.5, 69), (3, 2.5, 71),                             // A ... B - hangs on the V
+                (4, 0.0, 79), (4, 1.5, 76), (4, 2.5, 81), (4, 3.5, 79), // higher bounce, same shape
+                (5, 0.0, 74), (5, 3.0, 72), (5, 3.75, 74),              // D ... C D
+                (6, 0.0, 76), (6, 1.0, 79), (6, 2.5, 77), (6, 3.5, 74), // E G F D - lazy walk down
+                (7, 0.5, 71), (7, 2.0, 69),                             // B A - resolves into the wrap
             };
-            foreach (var (b, bt, m) in melody) AddFeltNote(buf, m, b * bar + bt * 0.85, 0.11f);
-            return ToClip("Synth_Lullaby", buf, 0.42f); // a touch deeper under the ASMR
+            foreach (var (b, bt, m) in melody)
+            {
+                double mt = b * bar + bt * beat + (bt % 1.0 > 0.4 ? swing : 0) + Jit();
+                AddKeysNote(buf, m, mt, 0.09f);
+                AddKeysNote(buf, m + 12, mt + 0.006, 0.026f); // octave sparkle
+            }
+            AddVinyl(buf, r);
+            return ToClip("Synth_Lofi", buf, 0.42f); // stays deep under the ASMR
         }
     }
 }
