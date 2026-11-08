@@ -92,16 +92,18 @@ namespace Crunchee.EditorTools
                 // butter silhouette (corner radius = body round + the gap).
                 float hx = ButterW / 2f + 2f * coatT, hz = depth / 2f + 2f * coatT;
                 float cornerR = 0.2f + 2f * coatT;
-                int nx = coating == Coating.Wax ? 3 + (waxLayers + 1) / 3 : 3;
-                int nz = coating == Coating.Wax ? 3 : 2;
-                var cells = VoronoiCells(hx * 2f, hz * 2f, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, 0f);
+                float layerT = Mathf.Clamp01((waxLayers - 1) / 9f);
+                int nx = coating == Coating.Wax ? Mathf.RoundToInt(Mathf.Lerp(6f, 3f, layerT)) : 3;
+                int nz = coating == Coating.Wax ? Mathf.RoundToInt(Mathf.Lerp(4f, 2f, layerT)) : 2;
+                float seamGap = coating == Coating.Wax ? Mathf.Lerp(0.005f, 0.014f, layerT) : 0f;
+                var cells = VoronoiCells(hx * 2f, hz * 2f, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, seamGap);
                 ClipToRoundedRect(cells, hx, hz, cornerR);
                 // Plates only appear post-crack now, so they can have a REAL
                 // bevel again - the bevelled top edges catch the sun glint and
                 // read as broken glass. (The old invisible bevel was only a
                 // problem when the plates showed pre-crack.)
                 float plateBevel = Mathf.Min(0.04f, coatT * 0.5f + 0.004f);
-                crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", (waxLayers - 1) / 9f);
+                crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", layerT);
                 crackedShellMat.SetFloat("_Frost", 0.55f); // stress-whitened, contrasts the butter in the gaps
                 var meshes = new List<Mesh>();
                 for (int ci = 0; ci < cells.Count; ci++)
