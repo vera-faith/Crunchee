@@ -135,15 +135,15 @@ namespace Crunchee.EditorTools
             // ------------------------------------------------ meshes
             var creamMesh = SdfMesher.Build(creamF, new Vector3(-0.85f, -0.05f, -0.75f), new Vector3(0.85f, 1.62f, 0.75f), 96);
             creamMesh.name = "BunnyCream";
-            MeshPart(bt, "CreamBody", SaveMesh(creamMesh, "BunnyCream"), cream);
+            MeshPart(bt, "CreamBody", SaveMesh(creamMesh, "BunnyCream"), cream, false);
 
             var headCaramelMesh = SdfMesher.Build(headCaramelF, new Vector3(-0.8f, 0.95f, -0.65f), new Vector3(0.8f, 1.62f, 0.65f), 88);
             headCaramelMesh.name = "BunnyCaramelHead";
-            MeshPart(bt, "CaramelHead", SaveMesh(headCaramelMesh, "BunnyCaramelHead"), caramel);
+            MeshPart(bt, "CaramelHead", SaveMesh(headCaramelMesh, "BunnyCaramelHead"), caramel, false);
 
             var bodyCaramelMesh = SdfMesher.Build(bodyCaramelF, new Vector3(-0.55f, -0.06f, -0.5f), new Vector3(0.55f, 0.62f, 0.5f), 64);
             bodyCaramelMesh.name = "BunnyCaramelBody";
-            MeshPart(bt, "CaramelBody", SaveMesh(bodyCaramelMesh, "BunnyCaramelBody"), caramel);
+            MeshPart(bt, "CaramelBody", SaveMesh(bodyCaramelMesh, "BunnyCaramelBody"), caramel, false);
 
             // ------------------------------------------------ ears (own SDF meshes under the existing pivots)
             // Each ear: cream drooping blade + a honey caramel coat over its
@@ -196,10 +196,10 @@ namespace Crunchee.EditorTools
                 var bmax = new Vector3(side > 0f ? 1.15f : 0.25f, 0.3f, 0.35f);
                 var em = SdfMesher.Build(earF, bmin, bmax, 56);
                 em.name = $"BunnyEar{sfx}";
-                MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
+                MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream, false);
                 var cm = SdfMesher.Build(earCoatF, bmin, bmax, 48);
                 cm.name = $"BunnyEarCaramel{sfx}";
-                MeshPart(pt, "EarCaramel", SaveMesh(cm, $"BunnyEarCaramel{sfx}"), honey);
+                MeshPart(pt, "EarCaramel", SaveMesh(cm, $"BunnyEarCaramel{sfx}"), honey, false);
             }
 
             // ------------------------------------------------ face
@@ -253,12 +253,14 @@ namespace Crunchee.EditorTools
         }
 
         /// <summary>A generated-mesh part under a parent (no collider).</summary>
-        static GameObject MeshPart(Transform parent, string name, Mesh mesh, Material m)
+        static GameObject MeshPart(Transform parent, string name, Mesh mesh, Material m, bool receiveShadows = true)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterial = m;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = m;
+            renderer.receiveShadows = receiveShadows;
             return go;
         }
     }
