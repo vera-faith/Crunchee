@@ -67,8 +67,12 @@ namespace Crunchee.EditorTools
             // ------------------------------------------------ SDF fields (BodyBob-local space)
             var headC = new Vector3(0f, 0.98f, 0f);
             var headR = new Vector3(0.64f, 0.55f, 0.53f);
-            var bodyC = new Vector3(0f, 0.28f, 0f);
-            var bodyR = new Vector3(0.36f, 0.28f, 0.30f);
+            float BodySd(Vector3 p)
+            {
+                float hem = SdfMesher.Ellipsoid(p, new Vector3(0f, 0.21f, 0f), new Vector3(0.39f, 0.22f, 0.30f));
+                float shoulders = SdfMesher.Ellipsoid(p, new Vector3(0f, 0.40f, 0f), new Vector3(0.28f, 0.19f, 0.24f));
+                return SdfMesher.Smin(hem, shoulders, 0.075f);
+            }
 
             // Cream skin: head + cheeks that melt in + body core + tail, one union.
             SdfMesher.Field creamF = p =>
@@ -77,9 +81,9 @@ namespace Crunchee.EditorTools
                 float cheeks = Mathf.Min(
                     SdfMesher.Ellipsoid(p, headC + new Vector3(-0.30f, -0.20f, 0.16f), new Vector3(0.30f, 0.26f, 0.27f)),
                     SdfMesher.Ellipsoid(p, headC + new Vector3(0.30f, -0.20f, 0.16f), new Vector3(0.30f, 0.26f, 0.27f)));
-                float body = SdfMesher.Ellipsoid(p, bodyC, bodyR);
-                float tail = SdfMesher.Sphere(p, new Vector3(0f, 0.30f, -0.34f), 0.11f);
-                return SdfMesher.Smin(SdfMesher.Smin(SdfMesher.Smin(head, cheeks, 0.12f), body, 0.10f), tail, 0.08f);
+                float body = BodySd(p);
+                float tail = SdfMesher.Sphere(p, new Vector3(0f, 0.25f, -0.32f), 0.085f);
+                return SdfMesher.Smin(SdfMesher.Smin(SdfMesher.Smin(head, cheeks, 0.12f), body, 0.08f), tail, 0.06f);
             };
 
             // Head caramel pour: a thin shell hugging the crown (+0.02 out,
@@ -115,16 +119,15 @@ namespace Crunchee.EditorTools
             // running down from the neck.
             SdfMesher.Field bodyCaramelF = p =>
             {
-                // Solid glazed body: the body ellipsoid inflated 0.028.
-                float f = SdfMesher.Ellipsoid(p, bodyC, bodyR) - 0.028f;
-                foreach (var deg in new[] { 30f, 95f, 150f, 210f, 265f, 330f })
+                float f = BodySd(p) - 0.024f;
+                foreach (var deg in new[] { 20f, 80f, 145f, 205f, 270f, 335f })
                 {
                     float a = deg * Mathf.Deg2Rad;
                     var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-                    float shrink = Mathf.Sqrt(Mathf.Max(0.05f, 1f - Mathf.Pow((0.48f - bodyC.y) / bodyR.y, 2f)));
-                    var top = bodyC + new Vector3(dir.x * (bodyR.x * shrink + 0.02f), 0.20f, dir.z * (bodyR.z * shrink + 0.02f));
-                    var tip = top + new Vector3(dir.x * 0.02f, -0.09f, dir.z * 0.02f);
-                    f = SdfMesher.Smin(f, SdfMesher.Capsule(p, top, tip, 0.038f), 0.025f);
+                    var top = new Vector3(dir.x * 0.30f, 0.43f, dir.z * 0.255f);
+                    float length = 0.10f + 0.035f * Mathf.Sin(a * 3f + 0.7f);
+                    var tip = top + new Vector3(dir.x * 0.018f, -length, dir.z * 0.018f);
+                    f = SdfMesher.Smin(f, SdfMesher.Capsule(p, top, tip, 0.034f), 0.025f);
                 }
                 return f;
             };
@@ -138,7 +141,7 @@ namespace Crunchee.EditorTools
             headCaramelMesh.name = "BunnyCaramelHead";
             MeshPart(bt, "CaramelHead", SaveMesh(headCaramelMesh, "BunnyCaramelHead"), caramel);
 
-            var bodyCaramelMesh = SdfMesher.Build(bodyCaramelF, new Vector3(-0.55f, -0.02f, -0.5f), new Vector3(0.55f, 0.62f, 0.5f), 64);
+            var bodyCaramelMesh = SdfMesher.Build(bodyCaramelF, new Vector3(-0.55f, -0.06f, -0.5f), new Vector3(0.55f, 0.62f, 0.5f), 64);
             bodyCaramelMesh.name = "BunnyCaramelBody";
             MeshPart(bt, "CaramelBody", SaveMesh(bodyCaramelMesh, "BunnyCaramelBody"), caramel);
 
