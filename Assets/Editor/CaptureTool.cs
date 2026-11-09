@@ -4,6 +4,8 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using Crunchee.Core;
+using Crunchee.Game;
 
 namespace Crunchee.EditorTools
 {
@@ -19,9 +21,11 @@ namespace Crunchee.EditorTools
         // terminal) drops Temp/crunchee-capture.flag and the editor rebuilds
         // the scene + writes Captures/ on its next update tick.
         const string FlagPath = "Temp/crunchee-capture.flag";
+        const string CaptureAllFlagPath = "Temp/crunchee-capture-all.flag";
         const string ExportFlagPath = "Temp/crunchee-export-sounds.flag";
         const string IosFlagPath = "Temp/crunchee-ios.flag";
         static int poll;
+        static string captureDirectory = "Captures/Bakery";
 
         [InitializeOnLoadMethod]
         static void WatchFlag()
@@ -34,14 +38,14 @@ namespace Crunchee.EditorTools
         static void Tick()
         {
             if (++poll % 45 != 0) return; // ~once a second, cheap
-            if (!File.Exists(FlagPath) && !File.Exists(ExportFlagPath) && !File.Exists(IosFlagPath)) return;
+            if (!File.Exists(FlagPath) && !File.Exists(CaptureAllFlagPath) && !File.Exists(ExportFlagPath) && !File.Exists(IosFlagPath)) return;
             // Never clobber her Play session: wait until she exits Play mode.
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             AssetDatabase.Refresh();
             // The refresh may kick off a compile/import; a domain reload re-runs
             // WatchFlag and the next tick retries - keep the flag until then so
             // stale code never builds.
-            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorUtility.scriptCompilationFailed) return;
             if (File.Exists(ExportFlagPath))
             {
                 File.Delete(ExportFlagPath);
@@ -65,21 +69,30 @@ namespace Crunchee.EditorTools
                 try { BuildAndCapture(); }
                 catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
             }
+            if (File.Exists(CaptureAllFlagPath))
+            {
+                File.Delete(CaptureAllFlagPath);
+                try { BuildAndCaptureAll(); }
+                catch (System.Exception e) { Debug.LogError("[Capture] " + e); }
+            }
         }
 
         [MenuItem("Crunchee/Capture Review Shots")]
-        public static void Capture()
+        public static void Capture() => Capture("Assets/Scenes/ButterPath.unity");
+
+        public static void Capture(string scenePath)
         {
-            var scenePath = "Assets/Scenes/ButterPath.unity";
+            captureDirectory = scenePath.Contains("ClassicButter") ? "Captures/Classic" : "Captures/Bakery";
             EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             var cam = Camera.main;
             var player = GameObject.FindGameObjectWithTag("Player");
             if (cam == null || player == null) { Debug.LogError("[Capture] camera/player missing"); return; }
-            Directory.CreateDirectory("Captures");
+            ValidateThemeScene();
+            Directory.CreateDirectory(captureDirectory);
 
             var steps = new List<Transform>();
-            foreach (var go in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
-                if (go.parent == null && (go.name.StartsWith("Butter_") || go.name.StartsWith("Candy_"))) steps.Add(go);
+            foreach (var q in Object.FindObjectsByType<Squishy>())
+                if (q.transform.parent != null) steps.Add(q.transform.parent);
             int Order(Transform t) { var q = t.GetComponentInChildren<Crunchee.Core.Squishy>(); return q != null ? q.pathOrder : 0; }
             steps.Sort((a, b) => Order(a).CompareTo(Order(b)));
 
@@ -90,7 +103,7 @@ namespace Crunchee.EditorTools
             var follow = cam.GetComponent<Crunchee.CameraRig.ThirdPersonFollow>();
             Vector3 off = follow != null ? follow.viewOffset : new Vector3(0f, 4.6f, -4.8f);
             Quaternion vrot = follow != null ? follow.ViewRotation : cam.transform.rotation;
-            int[] picks = { 0, 3, 9, 10, 11, 12, 13, 14, 15, 16, 19 };
+            int[] picks = { 0, 1, 2, 4, 7, 9, 14, 15, 16, 17, 20, 29 };
             var done = new HashSet<int>();
             foreach (var i in picks)
             {
@@ -100,7 +113,9 @@ namespace Crunchee.EditorTools
                 player.transform.position = top;
                 // She faces a different way in each shot: the view must not care.
                 player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
-                Shot(cam, $"{done.Count:00}_step{i + 1:00}_{s.name}", top + off, vrot);
+                var courseYaw = Quaternion.Euler(0f, i * EndlessSquishyPath.AngleStep, 0f);
+                var stepRot = follow != null ? Quaternion.LookRotation(courseYaw * (follow.aimOffset - follow.viewOffset)) : vrot;
+                Shot(cam, $"{done.Count:00}_step{i + 1:00}_{s.name}", top + courseYaw * off, stepRot);
             }
             player.transform.SetPositionAndRotation(startPos, startRot);
 
@@ -121,7 +136,7 @@ namespace Crunchee.EditorTools
             // Cracked-state previews: split the wax on butters 1, 4 and 10 at
             // their top centre, then retake the same gameplay-angle shot.
             // Edit mode only - the scene is never saved, so reopening resets it.
-            foreach (var i in new[] { 0, 3, 9 })
+            foreach (var i in new[] { 1, 3, 8, 9 })
             {
                 if (i < 0 || i >= steps.Count) continue;
                 var s = steps[i];
@@ -131,17 +146,68 @@ namespace Crunchee.EditorTools
                 sq.PreviewCrack(top);
                 player.transform.position = top;
                 player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
-                Shot(cam, $"50_cracked_step{i + 1:00}_{s.name}", top + off, vrot);
+                var courseYaw = Quaternion.Euler(0f, i * EndlessSquishyPath.AngleStep, 0f);
+                var stepRot = follow != null ? Quaternion.LookRotation(courseYaw * (follow.aimOffset - follow.viewOffset)) : vrot;
+                Shot(cam, $"50_cracked_step{i + 1:00}_{s.name}", top + courseYaw * off, stepRot);
             }
             player.transform.SetPositionAndRotation(startPos, startRot);
+            ValidateRecycling();
 
-            Debug.Log("[Capture] done: " + Path.GetFullPath("Captures"));
+            Debug.Log("[Capture] done: " + Path.GetFullPath(captureDirectory));
         }
 
         public static void BuildAndCapture()
         {
             ButterPathBuilder.Build();
-            Capture();
+            Capture("Assets/Scenes/ButterPath.unity");
+        }
+
+        public static void BuildAndCaptureClassic()
+        {
+            ButterPathBuilder.BuildClassicButter();
+            Capture("Assets/Scenes/ClassicButter.unity");
+        }
+
+        public static void BuildAndCaptureAll()
+        {
+            BuildAndCapture();
+            BuildAndCaptureClassic();
+        }
+
+        static void ValidateRecycling()
+        {
+            var path = Object.FindFirstObjectByType<EndlessSquishyPath>();
+            path.Initialize();
+            path.Touch(45);
+            path.Touch(75);
+            if (path.FocusIndex != 75) throw new System.Exception("[Capture] endless focus did not advance");
+            int expected = path.ahead + path.keepBehind + 1;
+            if (path.ActiveCount != expected) throw new System.Exception($"[Capture] endless active count {path.ActiveCount}, expected {expected}");
+            Debug.Log("[Capture] endless recycling validation passed");
+        }
+
+        static void ValidateThemeScene()
+        {
+            var path = Object.FindFirstObjectByType<EndlessSquishyPath>();
+            if (path == null) throw new System.Exception("[Capture] endless path missing");
+            if (path.stepTemplates == null || path.stepTemplates.Length != 15) throw new System.Exception("[Capture] expected 15 theme templates");
+            if (path.initialSteps == null || path.initialSteps.Length != 30) throw new System.Exception("[Capture] expected 30 initial steps");
+            if (path.player == null || path.cameraFollow == null || path.environmentChunks == null || path.environmentChunks.Length != 4)
+                throw new System.Exception("[Capture] path references incomplete");
+            string expectedSky = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "ClassicButter" ? "classicbutterSky" : "bakerySky";
+            if (RenderSettings.skybox == null || RenderSettings.skybox.name != expectedSky)
+                throw new System.Exception("[Capture] wrong theme sky material");
+            foreach (var go in path.initialSteps)
+                if (go == null || go.GetComponentInChildren<Squishy>() == null) throw new System.Exception("[Capture] invalid initial squishy");
+            for (int i = 0; i < 30; i++)
+            {
+                var a = EndlessSquishyPath.SlotPosition(i);
+                var b = EndlessSquishyPath.SlotPosition(i + EndlessSquishyPath.StepsPerTurn);
+                var delta = b - a;
+                if (Mathf.Abs(delta.x) > 0.001f || Mathf.Abs(delta.z) > 0.001f || Mathf.Abs(delta.y - EndlessSquishyPath.TurnHeight) > 0.001f)
+                    throw new System.Exception("[Capture] helix does not close cleanly");
+            }
+            Debug.Log("[Capture] theme scene validation passed");
         }
 
         static Vector3 TopOf(Transform t)
@@ -168,7 +234,7 @@ namespace Crunchee.EditorTools
             var tex = new Texture2D(W, H, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
             tex.Apply();
-            File.WriteAllBytes($"Captures/{name}.png", tex.EncodeToPNG());
+            File.WriteAllBytes($"{captureDirectory}/{name}.png", tex.EncodeToPNG());
             RenderTexture.active = null;
             cam.targetTexture = prev;
             cam.ResetAspect();

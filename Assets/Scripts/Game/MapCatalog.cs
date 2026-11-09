@@ -24,7 +24,8 @@ namespace Crunchee.Game
     {
         public static readonly List<MapInfo> Maps = new List<MapInfo>
         {
-            new MapInfo { id = "butterpath",  displayName = "Butter Path",  sceneName = "ButterPath",  available = true },
+            new MapInfo { id = "bakery", displayName = "Bakery Spiral", sceneName = "ButterPath", available = true },
+            new MapInfo { id = "classicbutter", displayName = "Classic Butter", sceneName = "ClassicButter", available = true },
             new MapInfo { id = "candyclouds", displayName = "Candy Clouds", sceneName = "CandyClouds", available = false },
             new MapInfo { id = "mochigarden", displayName = "Mochi Garden", sceneName = "MochiGarden", available = false },
         };

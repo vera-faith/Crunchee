@@ -366,11 +366,44 @@ namespace Crunchee.Audio
             return ToClip("Synth_Macaron", d, 0.6f);
         }
 
+        static AudioClip FlourBase(int seed)
+        {
+            var r = new System.Random(seed * 4099 + 19);
+            var d = SoftSquishBuf(r, 0.38f, 95f, 0.22f, 0.08f, 0.25f, 1.8f);
+            BandNoise(d, 0, (int)(0.3f * SR), 350f, 2800f, 0.5f, 18f, r);
+            return ToClip("Synth_Flour", d, 0.5f);
+        }
+
+        static AudioClip VanillaBase(int seed)
+        {
+            var r = new System.Random(seed * 3253 + 23);
+            var d = SoftSquishBuf(r, 0.45f, 130f, 0.12f, 1.25f, 0.3f, 1.2f);
+            for (int i = 0; i < 3; i++)
+            {
+                int at = (int)((0.045f + i * 0.06f + r.NextDouble() * 0.018f) * SR);
+                AddRing(d, at, 650f + (float)r.NextDouble() * 800f, 0.2f, 75f, 0.06f);
+            }
+            return ToClip("Synth_Vanilla", d, 0.58f);
+        }
+
+        static AudioClip CroissantBase(int seed)
+        {
+            var r = new System.Random(seed * 6151 + 29);
+            var d = SoftSquishBuf(r, 0.32f, 135f, 0.15f, 0.5f, 0.3f);
+            BandNoise(d, 0, (int)(0.1f * SR), 1100f, 6200f, 0.85f, 2400f, r);
+            for (int i = 0; i < 4; i++)
+                BandNoise(d, (int)((0.025f + i * 0.018f) * SR), 700, 1800f, 5800f, 0.32f - i * 0.05f, 2300f, r);
+            return ToClip("Synth_Croissant", d, 0.64f);
+        }
+
         /// <summary>Route a base material to its character sound.</summary>
         public static AudioClip BaseFor(BaseMaterial b, int seed)
         {
             switch (b)
             {
+                case BaseMaterial.Flour: return FlourBase(seed);
+                case BaseMaterial.Vanilla: return VanillaBase(seed);
+                case BaseMaterial.Croissant: return CroissantBase(seed);
                 case BaseMaterial.CakeSponge: return SpongeBase(seed);
                 case BaseMaterial.Jam:
                 case BaseMaterial.Grape:
