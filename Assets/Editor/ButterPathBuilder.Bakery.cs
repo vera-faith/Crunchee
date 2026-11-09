@@ -214,29 +214,16 @@ namespace Crunchee.EditorTools
                 }
             }
 
-            // --- Soft clouds drifting beside the climb ---
-            var cloudMat = Mat("Cloud", new Color(0.99f, 0.98f, 1f), 1f, 0.22f);
-            cloudMat.EnableKeyword("_EMISSION");
-            cloudMat.SetColor("_EmissionColor", new Color(0.4f, 0.37f, 0.42f));
-            for (int i = 0; i < 4; i++) // a few soft clouds - pink accent, not clutter
-            {
-                float z = Mathf.Lerp(zMin + 8f, zMax - 6f, i / 3f);
-                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
-                var cp = new Vector3((i % 2 == 0 ? -1f : 1f) * Random.Range(5.5f, 7f), Mathf.Max(0.6f, pathY - Random.Range(0.8f, 1.5f)), z); // never below the floor
-                BuildCloud(cp, Random.Range(1f, 1.5f), cloudMat);
-            }
-
-            // --- Twinkle dust drifting down the hall ---
-            var dust = new GameObject("TwinkleDust").AddComponent<ParticleSystem>();
-            dust.transform.position = new Vector3(0f, finishPos.y * 0.5f + 2f, (zMin + zMax) / 2f);
+            var dust = new GameObject("FlourDust").AddComponent<ParticleSystem>();
+            dust.transform.position = new Vector3(0f, finishPos.y * 0.5f + 1.6f, (zMin + zMax) / 2f);
             var dmain = dust.main;
-            dmain.loop = true; dmain.playOnAwake = true; dmain.startLifetime = 6f;
-            dmain.startSpeed = 0.12f; dmain.startSize = 0.08f; dmain.maxParticles = 120;
-            dmain.startColor = new Color(1f, 0.93f, 0.8f, 0.45f);
-            var dem = dust.emission; dem.rateOverTime = 18f;
+            dmain.loop = true; dmain.playOnAwake = true; dmain.startLifetime = 8f;
+            dmain.startSpeed = 0.05f; dmain.startSize = 0.035f; dmain.maxParticles = 180;
+            dmain.startColor = new Color(1f, 0.92f, 0.78f, 0.28f);
+            var dem = dust.emission; dem.rateOverTime = 24f;
             var dshape = dust.shape; dshape.shapeType = ParticleSystemShapeType.Box;
-            dshape.scale = new Vector3(HallHalfW * 1.8f, finishPos.y + 6f, zMax - zMin);
-            dust.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
+            dshape.scale = new Vector3(HallHalfW * 1.5f, finishPos.y + 5f, zMax - zMin);
+            dust.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat(false);
         }
 
         /// <summary>One soft cloud: a cluster of flattened matte puffs.</summary>
@@ -304,7 +291,7 @@ namespace Crunchee.EditorTools
                 // shelves of pastries against the walls
                 for (float z = zMin + 8f; z < zMax - 4f; z += 12f)
                 {
-                    var shelf = BuildShelf(new Vector3(side * (HallHalfW - 0.9f), -0.05f, z), BakeryCakeMats(), PropMat("Cherry", new Color(0.9f, 0.15f, 0.25f), 0.9f, 0.05f));
+                    var shelf = BuildShelf(new Vector3(side * (HallHalfW - 2.2f), -0.05f, z), BakeryCakeMats(), PropMat("Cherry", new Color(0.9f, 0.15f, 0.25f), 0.9f, 0.05f));
                     shelf.transform.rotation = Quaternion.Euler(0f, side < 0f ? 90f : -90f, 0f);
                     shelf.transform.SetParent(root, true);
                     Staticize(shelf);
@@ -320,22 +307,16 @@ namespace Crunchee.EditorTools
                     b.transform.localRotation = Quaternion.Euler(0f, side < 0f ? 90f : -90f, 0f);
                 }
             }
+            var farWall = Box("FarWall", new Vector3(0f, wallH / 2f - 0.3f, zMax + 0.1f), new Vector3(HallHalfW * 2f + 0.6f, wallH, 0.3f), plaster);
+            farWall.transform.SetParent(root, true);
+            Staticize(farWall);
             // big warm window at the far end, behind the finish cake
             var farW = Box("FarWindowFrame", new Vector3(0f, topY * 0.5f + 2.8f, zMax - 0.2f), new Vector3(4.5f, 3.4f, 0.15f), frameMat);
             farW.transform.SetParent(root, true); Staticize(farW);
             var farP = Box("FarWindowPane", new Vector3(0f, topY * 0.5f + 2.8f, zMax - 0.28f), new Vector3(4f, 3f, 0.1f), paneMat);
             farP.transform.SetParent(root, true); Staticize(farP);
 
-            // at most 8 floating candies, high and off to the sides
-            for (int i = 0; i < 8; i++)
-            {
-                float side = i % 2 == 0 ? -1f : 1f;
-                var pos = new Vector3(side * Random.Range(4.5f, 7f), topY * 0.6f + Random.Range(1.5f, 5f), Mathf.Lerp(zMin + 4f, zMax - 4f, (i + 0.5f) / 8f));
-                var prop = CandyProp(i % 7, pos, Random.Range(0.7f, 1.1f), root);
-                var bob = prop.gameObject.AddComponent<FloatBob>();
-                bob.amplitude = Random.Range(0.15f, 0.3f); bob.speed = Random.Range(0.4f, 0.8f);
-                bob.spin = Random.Range(-14f, 14f); bob.phase = Random.Range(0f, 6.28f);
-            }
+
         }
 
         static Material[] BakeryCakeMats() => new[]
@@ -354,6 +335,31 @@ namespace Crunchee.EditorTools
 
         // ======================================================== floor props
 
+        static void BuildCounterIslands(float zMin)
+        {
+            var root = new GameObject("BakeryCounters").transform;
+            var baseMat = PropMat("CounterBase", new Color(0.58f, 0.42f, 0.28f), 0.35f, 0.03f);
+            var topMat = PropMat("CounterTop", new Color(0.78f, 0.61f, 0.43f), 0.5f, 0.04f);
+            float zMax = SlotZ(9) + 4.5f;
+            for (float z = zMin + 4.5f; z < zMax; z += 4.4f)
+            {
+                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
+                float counterY = Mathf.Max(0.08f, pathY - 0.68f);
+                foreach (var side in new[] { -1f, 1f })
+                {
+                    float x = side * 4.25f;
+                    var body = Box("CounterBase", new Vector3(x, (-0.2f + counterY) * 0.5f, z), new Vector3(2.1f, counterY + 0.2f, 3.8f), baseMat);
+                    body.transform.SetParent(root, true);
+                    Object.DestroyImmediate(body.GetComponent<Collider>());
+                    Staticize(body);
+                    var top = Box("CounterTop", new Vector3(x, counterY + 0.045f, z), new Vector3(2.25f, 0.09f, 4f), topMat);
+                    top.transform.SetParent(root, true);
+                    Object.DestroyImmediate(top.GetComponent<Collider>());
+                    Staticize(top);
+                }
+            }
+        }
+
         /// <summary>Bakery props scattered on the floor along both sides of
         /// the climb (never on the path): SDF croissants + cinnamon rolls,
         /// macarons, cupcakes, honey jars, bowls, milk bottles, some on
@@ -362,12 +368,15 @@ namespace Crunchee.EditorTools
         {
             var cakeMats = BakeryCakeMats();
             var cherryMat = PropMat("Cherry", new Color(0.9f, 0.15f, 0.25f), 0.9f, 0.05f);
+            BuildCounterIslands(zMin);
+            float counterZMax = SlotZ(9) + 4.5f;
             int k = 0;
             for (float z = zMin + 3.5f; z < zMax - 3f; z += 4.2f, k++)
             {
                 float side = k % 2 == 0 ? -1f : 1f;
-                float x = side * Random.Range(4.6f, 6.8f);
-                float y = -0.2f;
+                float x = side * Random.Range(3.65f, 4.75f);
+                float pathY = 0.35f + Mathf.Max(0f, z - PathStartZ) / PathAdvance * PathRise;
+                float y = z < counterZMax ? Mathf.Max(0.08f, pathY - 0.68f) + 0.1f : -0.2f;
                 var at = new Vector3(x, y, z + Random.Range(-0.8f, 0.8f));
                 GameObject g;
                 switch (k % 13)
@@ -387,6 +396,7 @@ namespace Crunchee.EditorTools
                     default: g = BuildCupcake(at, cakeMats[k % 3], cherryMat); break;
                 }
                 if (g != null && k % 4 == 0) LiftOnStand(g, at);
+                if (g != null) Staticize(g);
             }
             // a couple of pink cake stands as accents
             var standMat = PropMat("StandPink", new Color(0.97f, 0.7f, 0.78f), 0.9f, 0.1f);
