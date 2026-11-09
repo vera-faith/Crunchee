@@ -95,7 +95,7 @@ namespace Crunchee.EditorTools
                 float layerT = Mathf.Clamp01((waxLayers - 1) / 9f);
                 int nx = coating == Coating.Wax ? Mathf.RoundToInt(Mathf.Lerp(6f, 3f, layerT)) : 3;
                 int nz = coating == Coating.Wax ? Mathf.RoundToInt(Mathf.Lerp(4f, 2f, layerT)) : 2;
-                float seamGap = coating == Coating.Wax ? Mathf.Lerp(0.005f, 0.014f, layerT) : 0f;
+                float seamGap = coating == Coating.Wax ? Mathf.Lerp(0.008f, 0.014f, layerT) : 0f;
                 var cells = VoronoiCells(hx * 2f, hz * 2f, nx, nz, 7919 * waxLayers + nx * 31 + (int)coating, seamGap);
                 ClipToRoundedRect(cells, hx, hz, cornerR);
                 // Plates only appear post-crack now, so they can have a REAL
@@ -104,7 +104,7 @@ namespace Crunchee.EditorTools
                 // problem when the plates showed pre-crack.)
                 float plateBevel = Mathf.Min(0.04f, coatT * 0.5f + 0.004f);
                 crackedShellMat = WaxCoatMaterial($"{shellMat.name}Cracked", layerT);
-                crackedShellMat.SetFloat("_Frost", 0.55f); // stress-whitened, contrasts the butter in the gaps
+                crackedShellMat.SetFloat("_Frost", 0.65f); // stress-whitened, contrasts the butter in the gaps
                 var meshes = new List<Mesh>();
                 for (int ci = 0; ci < cells.Count; ci++)
                 {
