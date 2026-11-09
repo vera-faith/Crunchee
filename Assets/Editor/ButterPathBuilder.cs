@@ -95,8 +95,8 @@ namespace Crunchee.EditorTools
             // like window light. Elevation 55 keeps a step's shadow to ~0.4 m
             // on the step below (the climb rises 0.55 per 2.3 m). ---
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.15f;
-            sun.color = new Color(1f, 0.88f, 0.72f);
+            sun.type = LightType.Directional; sun.intensity = 0.95f;
+            sun.color = new Color(1f, 0.87f, 0.7f);
             sun.transform.rotation = Quaternion.Euler(55f, 200f, 0f);
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.6f;
@@ -186,8 +186,8 @@ namespace Crunchee.EditorTools
             var pfx = camGo.AddComponent<CruncheePostFX>();
             pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
             // Golden-hour grade: mostly-neutral, low bloom, gentle vignette.
-            pfx.exposure = 0.9f; pfx.threshold = 1.2f; pfx.bloomIntensity = 0.15f;
-            pfx.saturation = 1.08f; pfx.contrast = 1.1f; pfx.vignette = 0.3f;
+            pfx.exposure = 0.82f; pfx.threshold = 1.05f; pfx.bloomIntensity = 0.18f;
+            pfx.saturation = 1.05f; pfx.contrast = 1.07f; pfx.vignette = 0.32f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
