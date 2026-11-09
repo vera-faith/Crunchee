@@ -58,9 +58,9 @@ namespace Crunchee.EditorTools
             // Kept modest: sun + fill + ambient all stacking on pale surfaces
             // is what clipped the whole frame white.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.46f, 0.41f, 0.37f);
-            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.42f, 0.35f); // lifts the camera-facing sides
-            RenderSettings.ambientGroundColor = new Color(0.31f, 0.25f, 0.24f);
+            RenderSettings.ambientSkyColor = new Color(0.40f, 0.36f, 0.34f);
+            RenderSettings.ambientEquatorColor = new Color(0.44f, 0.36f, 0.30f); // lifts the camera-facing sides
+            RenderSettings.ambientGroundColor = new Color(0.27f, 0.22f, 0.21f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.96f, 0.86f, 0.76f);
@@ -89,8 +89,8 @@ namespace Crunchee.EditorTools
             // bounce, still well under the key sun.
             var fill = new GameObject("SkyFill").AddComponent<Light>();
             fill.type = LightType.Directional;
-            fill.color = new Color(1f, 0.88f, 0.7f);
-            fill.intensity = 0.45f;
+            fill.color = new Color(1f, 0.95f, 0.82f);
+            fill.intensity = 0.38f;
             fill.shadows = LightShadows.None;
             fill.transform.rotation = Quaternion.Euler(28f, 10f, 0f);
         }
@@ -100,10 +100,12 @@ namespace Crunchee.EditorTools
 
         static Material CheckerFloorMat()
         {
-            var m = Mat("RoomFloor", Color.white, 1f, 0.55f);
+            var m = Mat("RoomFloor", Color.white, 1f, 0.25f);
             m.mainTexture = CheckerTexture();
             m.mainTextureScale = new Vector2(7f, 7f);
-            m.SetFloat("_RimStrength", 0.15f);
+            m.SetFloat("_RimStrength", 0.04f);
+            m.SetFloat("_SpecStrength", 0.35f);
+            m.SetFloat("_EnvStrength", 0.1f);
             return m;
         }
 
