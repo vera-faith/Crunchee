@@ -113,7 +113,7 @@ namespace Crunchee.EditorTools
                 player.transform.position = top;
                 // She faces a different way in each shot: the view must not care.
                 player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
-                var courseYaw = Quaternion.Euler(0f, i * EndlessSquishyPath.AngleStep, 0f);
+                var courseYaw = Quaternion.Euler(0f, EndlessSquishyPath.SideYawAt(i), 0f);
                 var stepRot = follow != null ? Quaternion.LookRotation(courseYaw * (follow.aimOffset - follow.viewOffset)) : vrot;
                 Shot(cam, $"{done.Count:00}_step{i + 1:00}_{s.name}", top + courseYaw * off, stepRot);
             }
@@ -146,7 +146,7 @@ namespace Crunchee.EditorTools
                 sq.PreviewCrack(top);
                 player.transform.position = top;
                 player.transform.rotation = Quaternion.Euler(0f, (i * 77) % 360, 0f);
-                var courseYaw = Quaternion.Euler(0f, i * EndlessSquishyPath.AngleStep, 0f);
+                var courseYaw = Quaternion.Euler(0f, EndlessSquishyPath.SideYawAt(i), 0f);
                 var stepRot = follow != null ? Quaternion.LookRotation(courseYaw * (follow.aimOffset - follow.viewOffset)) : vrot;
                 Shot(cam, $"50_cracked_step{i + 1:00}_{s.name}", top + courseYaw * off, stepRot);
             }

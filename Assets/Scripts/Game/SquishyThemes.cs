@@ -13,13 +13,16 @@ namespace Crunchee.Game
         public Coating coating;
         [Range(1, 10)] public int waxLayers;
         public bool wrapped;
+        [Tooltip("Turntable speed in deg/s (0 = still). Parkour spinners: she has to walk against the rotation.")]
+        public float spin;
 
-        public SquishyStepDefinition(SquishyItem item, Coating coating = Coating.Plain, int waxLayers = 1, bool wrapped = true)
+        public SquishyStepDefinition(SquishyItem item, Coating coating = Coating.Plain, int waxLayers = 1, bool wrapped = true, float spin = 0f)
         {
             this.item = item;
             this.coating = coating;
             this.waxLayers = waxLayers;
             this.wrapped = wrapped;
+            this.spin = spin;
         }
     }
 
@@ -57,12 +60,12 @@ namespace Crunchee.Game
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 2),
             new SquishyStepDefinition(SquishyItem.FlourBag),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Plain, 1, false),
-            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 3),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 3, true, 38f),  // parkour spinner
             new SquishyStepDefinition(SquishyItem.VanillaBowl),
             new SquishyStepDefinition(SquishyItem.Croissant),
-            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 5),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 5, true, -32f), // parkour spinner
             new SquishyStepDefinition(SquishyItem.FlourBag),
-            new SquishyStepDefinition(SquishyItem.Butter),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Plain, 1, true, 45f), // parkour spinner
             new SquishyStepDefinition(SquishyItem.Croissant),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 4),
             new SquishyStepDefinition(SquishyItem.VanillaBowl),
@@ -74,14 +77,14 @@ namespace Crunchee.Game
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 1),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Sugar, 1, false),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 2),
-            new SquishyStepDefinition(SquishyItem.Butter),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Plain, 1, true, 40f), // parkour spinner
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 3),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Sugar, 1, false),
-            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 5),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 5, true, -34f),  // parkour spinner
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Plain, 1, false),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 1),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Sugar, 1, false),
-            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 4),
+            new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 4, true, 30f),   // parkour spinner
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 2),
             new SquishyStepDefinition(SquishyItem.Butter),
             new SquishyStepDefinition(SquishyItem.Butter, Coating.Wax, 5),

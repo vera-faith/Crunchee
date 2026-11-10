@@ -5,15 +5,32 @@ using Crunchee.CameraRig;
 
 namespace Crunchee.Game
 {
+    /// <summary>
+    /// The endless course (Nov 9, "the map is like a cube box"): the squishies
+    /// line the four sides of a giant square tower and the path spirals up
+    /// around it. Five slots per side; the spacing alternates walk-together
+    /// steps and real JUMP gaps so it plays like parkour - land on a spinner,
+    /// walk across, hop the gap. The camera keeps riding just behind the
+    /// course like before, only now it rounds the corners with her.
+    /// </summary>
     public sealed class EndlessSquishyPath : MonoBehaviour
     {
         public const int StepsPerTurn = ThemePath.StepsPerTurn;
-        public const float AngleStep = 360f / StepsPerTurn;
+        public const int StepsPerSide = StepsPerTurn / 4;
         public const float BaseY = 0.35f;
         public const float Rise = 0.55f;
-        public const float StartZ = 3.15f;
         public const float TurnHeight = StepsPerTurn * Rise;
-        public static readonly float Radius = 3.55f / (2f * Mathf.Sin(AngleStep * 0.5f * Mathf.Deg2Rad));
+        // One floor of the tower in slot-advance units: two ~4.45 jump gaps,
+        // two ~3.15 walk gaps and a 4.0 walk around the corner per side.
+        public const float SideLength = 19.2f;
+        public const float HalfSide = SideLength * 0.5f;
+        public static readonly Vector3 Center = Vector3.zero;
+
+        // Distance from each side's leading corner to its slots, in path
+        // order: hop onto the corner slot, JUMP the first gap, walk one, JUMP
+        // the second, walk the last slot, then walk around the corner.
+        static readonly float[] SideOffsets = { 1.02f, 5.47f, 8.62f, 13.07f, 16.22f };
+        static readonly float[] SideYaws = { 90f, 180f, 270f, 0f };
 
         public Transform player;
         public ThirdPersonFollow cameraFollow;
@@ -41,13 +58,30 @@ namespace Crunchee.Game
         public int FocusIndex => focusIndex;
         public int ActiveCount => active.Count;
 
-        public static Vector3 SlotPosition(int index)
+        static int SideOf(int index)
         {
-            float a = index * AngleStep * Mathf.Deg2Rad;
-            return new Vector3(Radius * (1f - Mathf.Cos(a)), BaseY + index * Rise, StartZ + Radius * Mathf.Sin(a));
+            int step = ((index % StepsPerTurn) + StepsPerTurn) % StepsPerTurn;
+            return step / StepsPerSide;
         }
 
-        public static Quaternion SlotRotation(int index) => Quaternion.Euler(0f, index * AngleStep, 0f);
+        /// <summary>Yaw of the course direction at a slot (the travel tangent).</summary>
+        public static float SideYawAt(int index) => SideYaws[SideOf(index)];
+
+        public static Vector3 SlotPosition(int index)
+        {
+            int step = ((index % StepsPerTurn) + StepsPerTurn) % StepsPerTurn;
+            float t = SideOffsets[step % StepsPerSide];
+            float y = BaseY + index * Rise;
+            switch (step / StepsPerSide)
+            {
+                case 0: return new Vector3(Center.x - HalfSide + t, y, Center.z + HalfSide);
+                case 1: return new Vector3(Center.x + HalfSide, y, Center.z + HalfSide - t);
+                case 2: return new Vector3(Center.x + HalfSide - t, y, Center.z - HalfSide);
+                default: return new Vector3(Center.x - HalfSide, y, Center.z - HalfSide + t);
+            }
+        }
+
+        public static Quaternion SlotRotation(int index) => Quaternion.Euler(0f, SideYawAt(index), 0f);
 
         void Awake() => Initialize();
 
@@ -81,7 +115,7 @@ namespace Crunchee.Game
         {
             if (cameraFollow != null)
             {
-                float targetYaw = focusIndex * AngleStep;
+                float targetYaw = SideYawAt(focusIndex);
                 cameraFollow.fixedYaw = Mathf.LerpAngle(cameraFollow.fixedYaw, targetYaw, 1f - Mathf.Exp(-1.6f * Time.deltaTime));
             }
         }

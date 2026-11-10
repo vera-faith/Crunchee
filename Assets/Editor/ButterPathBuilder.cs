@@ -16,15 +16,12 @@ namespace Crunchee.EditorTools
 {
     /// <summary>
     /// One-click map build. Menu: Crunchee > Build Butter Path Scene
-    /// Bakery map, Butter Path. DESIGN TARGET = Faith's UI mockup (Nov 3):
-    /// long glossy butter bars on little trays, lined up on a warm peachy
-    /// bakery COUNTER scattered with macarons, cupcakes, a flour bowl and a
-    /// honey jar; the bunny starts on a white frosting slab with sprinkles;
-    /// golden sunlight; UI = MOVE joystick + pink JUMP (already matching).
-    /// ONLY the 10 wax butters - each one a little whiter than the last
-    /// (wax layers 1..10, translucent build-up). One land per squishy ->
-    /// coating cracks -> the character slowly sinks in, and cracks keep
-    /// spreading + crackling underfoot wherever she walks on the butter.
+    /// Cube-box parkour map (Nov 9, reference video): the squishies line the
+    /// sides of a giant square tower and spiral up - butter sticks plus
+    /// pastries of other shapes, walk gaps and real jump gaps, some butters
+    /// turntable under her feet. One land per squishy -> coating cracks ->
+    /// the character slowly sinks in, and cracks keep crackling underfoot
+    /// wherever she walks.
     /// </summary>
     public static partial class ButterPathBuilder
     {
@@ -127,10 +124,16 @@ namespace Crunchee.EditorTools
             var butterMat = ButterBodyMat("Butter", new Color(1f, 0.84f, 0.36f), 0.58f);
             var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.88f, 0.44f), 0.62f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
-            var board = Box("StartBoard", new Vector3(0f, 0.03f, 0f), new Vector3(4.7f, 0.12f, 4.7f), Mat("Board", new Color(0.85f, 0.62f, 0.44f), 1f, 0.45f));
+            // The start platform hangs just before slot 0 along the course,
+            // flush with the tower wall (Nov 9, cube-box map).
+            var slot0 = EndlessSquishyPath.SlotPosition(0);
+            var courseDir = EndlessSquishyPath.SlotPosition(1) - slot0;
+            courseDir.y = 0f; courseDir.Normalize();
+            var startCenter = slot0 - courseDir * 3.4f;
+            var board = Box("StartBoard", new Vector3(startCenter.x, 0.03f, startCenter.z), new Vector3(4.7f, 0.12f, 4.7f), Mat("Board", new Color(0.85f, 0.62f, 0.44f), 1f, 0.45f));
             Object.DestroyImmediate(board.GetComponent<Collider>());
-            Box("StartPlatform", new Vector3(0f, 0.29f, 0f), new Vector3(4f, 0.4f, 4f), frostingMat);
-            if (theme == SquishyTheme.Bakery) SprinkleTops(new Vector3(0f, 0.5f, 0f), 1.8f, 44);
+            Box("StartPlatform", new Vector3(startCenter.x, 0.29f, startCenter.z), new Vector3(4f, 0.4f, 4f), frostingMat);
+            if (theme == SquishyTheme.Bakery) SprinkleTops(new Vector3(startCenter.x, 0.5f, startCenter.z), 1.8f, 44);
 
             var endless = new GameObject("EndlessSquishyPath").AddComponent<EndlessSquishyPath>();
             endless.ahead = 25; endless.keepBehind = 5; endless.environmentFirstIndex = -1;
@@ -143,7 +146,7 @@ namespace Crunchee.EditorTools
                 var def = definitions[i];
                 string name = $"{definition.id}_{i:00}_{def.item}_{def.coating}{def.waxLayers}";
                 templates[i] = def.item == SquishyItem.Butter
-                    ? BuildButter(Vector3.zero, name, def.coating, def.waxLayers, butterMat, patMat, 0f, StepDepth, default, def.wrapped)
+                    ? BuildButter(Vector3.zero, name, def.coating, def.waxLayers, butterMat, patMat, 0f, StepDepth, default, def.wrapped, def.spin)
                     : BuildBakeryItem(Vector3.zero, name, def.item, 0f);
                 templates[i].transform.SetParent(templateRoot, false);
             }
@@ -168,7 +171,7 @@ namespace Crunchee.EditorTools
             for (int i = 0; i < environment.Length; i++) environment[i] = BuildThemeEnvironmentChunk(definition, i - 1);
             endless.environmentChunks = environment;
 
-            var player = BuildPuddingBunny(new Vector3(0f, 1.0f, 0f));
+            var player = BuildPuddingBunny(new Vector3(startCenter.x, 1.0f, startCenter.z));
             var pc = player.GetComponent<PlayerController>();
             endless.player = player.transform;
 
@@ -187,6 +190,7 @@ namespace Crunchee.EditorTools
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;
+            follow.fixedYaw = EndlessSquishyPath.SideYawAt(0); // behind the course at the start wall
             follow.viewOffset = new Vector3(0f, 7.4f, -8f);
             follow.aimOffset = new Vector3(0f, 0.5f, 2.3f);
             endless.cameraFollow = follow;

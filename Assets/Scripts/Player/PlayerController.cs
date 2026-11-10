@@ -27,6 +27,7 @@ namespace Crunchee.Player
         Vector2 dragInput;
         Vector2 smoothInput; // dragInput eased over time, so starts/stops/direction changes ramp instead of jerking
         Squishy groundSquishy;
+        Crunchee.Game.SpinPlatform groundSpin;
         bool wasGrounded;
         float distOnSquishy;
         Vector3 lastPos;
@@ -69,6 +70,11 @@ namespace Crunchee.Player
             velocity.y += gravity * Time.deltaTime;
             cc.Move((move + velocity) * Time.deltaTime);
 
+            // Parkour spinners carry her: the butter turntables under her
+            // feet and she has to walk against the drag (Nov 9).
+            if (groundSpin != null)
+                cc.Move(groundSpin.SurfaceVelocityAt(transform.position) * Time.deltaTime);
+
             // Safety net: never fall forever. If she somehow leaves the
             // world, put her back at the start (Nov 3: the room floor had no
             // collider and she fell 41,720 units into the void).
@@ -101,7 +107,7 @@ namespace Crunchee.Player
             float target = groundSquishy != null ? groundSquishy.DentDepth : 0f;
             dentNow = Mathf.Lerp(dentNow, target, 1f - Mathf.Exp(-10f * Time.deltaTime));
             if (groundSquishy != null) dentPos = transform.position;
-            Shader.SetGlobalVector(DentId, new Vector4(dentPos.x, dentPos.y, dentPos.z, 0.8f));
+            Shader.SetGlobalVector(DentId, new Vector4(dentPos.x, dentPos.y, dentPos.z, 0.95f));
             Shader.SetGlobalFloat(DentDepthId, dentNow);
             if (model) model.localPosition = new Vector3(0f, -dentNow * 0.85f, 0f);
         }
@@ -109,6 +115,7 @@ namespace Crunchee.Player
         void ReleaseSquishy()
         {
             if (groundSquishy != null) { groundSquishy.SetOccupied(false); groundSquishy = null; }
+            groundSpin = null;
         }
 
         void UpdateSquishyContact()
@@ -127,6 +134,7 @@ namespace Crunchee.Player
                 {
                     sq.SetOccupied(true);
                     sq.OnLanded(Mathf.Abs(velocity.y), transform.position);
+                    groundSpin = sq.GetComponent<Crunchee.Game.SpinPlatform>();
                     spawnPos = transform.position + Vector3.up * 0.65f;
                     if (!wasGrounded) squash?.OnLand();
                 }
