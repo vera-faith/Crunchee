@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
@@ -65,18 +66,19 @@ namespace Crunchee.EditorTools
         }
 
         /// <summary>
-        /// Settings gear button (top-right, inside the safe-area margin) +
-        /// the cream panel it opens: Music/ASMR sliders, the map cards and
-        /// a close button. All behavior lives in SettingsMenu (runtime).
+        /// Halohalo-style corner buttons: the menu (≡) opens the settings
+        /// panel from the TOP-LEFT, the speaker mute toggle sits TOP-RIGHT.
+        /// The panel keeps Music/ASMR sliders, the map cards and a close
+        /// button. Behavior lives in SettingsMenu + MuteButton (runtime).
         /// </summary>
         static void BuildSettingsUI(Transform canvasT, Font font)
         {
             var menu = canvasT.gameObject.AddComponent<SettingsMenu>();
 
-            // small round cream gear button, top-right corner
-            var gear = MakeCircle(canvasT, "SettingsButton", new Vector2(-86f, -96f), 92f, new Color(0.99f, 0.95f, 0.9f, 0.85f), anchorRight: true);
-            gear.anchorMin = gear.anchorMax = new Vector2(1f, 1f);
-            gear.anchoredPosition = new Vector2(-86f, -96f);
+            // small round cream menu button, top-left corner
+            var gear = MakeCircle(canvasT, "MenuButton", new Vector2(86f, -96f), 92f, new Color(0.99f, 0.95f, 0.9f, 0.85f));
+            gear.anchorMin = gear.anchorMax = new Vector2(0f, 1f);
+            gear.anchoredPosition = new Vector2(86f, -96f);
             var gb = gear.gameObject.AddComponent<Button>();
             gb.targetGraphic = gear.GetComponent<Image>();
             var gearIcon = new GameObject("GearIcon").AddComponent<Text>();
@@ -86,6 +88,23 @@ namespace Crunchee.EditorTools
             gearIcon.raycastTarget = false;
             var gr = gearIcon.rectTransform; gr.anchorMin = Vector2.zero; gr.anchorMax = Vector2.one; gr.offsetMin = gr.offsetMax = Vector2.zero;
             gb.onClick.AddListener(menu.Toggle);
+
+            // matching round speaker mute toggle, top-right corner
+            var mute = MakeCircle(canvasT, "MuteButton", new Vector2(-86f, -96f), 92f, new Color(0.99f, 0.95f, 0.9f, 0.85f), anchorRight: true);
+            mute.anchorMin = mute.anchorMax = new Vector2(1f, 1f);
+            mute.anchoredPosition = new Vector2(-86f, -96f);
+            var mb = mute.gameObject.AddComponent<Button>();
+            mb.targetGraphic = mute.GetComponent<Image>();
+            var speakerIcon = new GameObject("SpeakerIcon").AddComponent<Image>();
+            speakerIcon.transform.SetParent(mute, false);
+            speakerIcon.raycastTarget = false;
+            var irt = speakerIcon.rectTransform;
+            irt.anchorMin = Vector2.zero; irt.anchorMax = Vector2.one;
+            irt.offsetMin = new Vector2(20f, 20f); irt.offsetMax = new Vector2(-20f, -20f);
+            var muteBtn = mute.gameObject.AddComponent<MuteButton>();
+            muteBtn.icon = speakerIcon;
+            muteBtn.soundOn = SpeakerSprite(false);
+            muteBtn.soundOff = SpeakerSprite(true);
 
             // fullscreen soft-dim blocker that eats taps while the panel is open
             var blocker = MakeImage(canvasT, "SettingsPanel", Vector2.zero, Vector2.zero, new Color(0.25f, 0.18f, 0.12f, 0.35f));
@@ -212,6 +231,62 @@ namespace Crunchee.EditorTools
             float ax = anchorRight ? 1f : 0f;
             rt.anchorMin = rt.anchorMax = new Vector2(ax, 0f);
             rt.anchoredPosition = anchored; rt.sizeDelta = new Vector2(170f, 52f);
+        }
+
+        /// <summary>A white speaker glyph drawn in pixels: box + horn cone,
+        /// then two sound arcs (or a big X when muted).</summary>
+        static Sprite SpeakerSprite(bool muted)
+        {
+            return LoadOrCreateSprite(muted ? "Assets/Textures/IconMuted.png" : "Assets/Textures/IconSound.png",
+                96, 96, (x, y, w, h) =>
+            {
+                bool inside = false;
+                // speaker box
+                if (x >= 14 && x <= 30 && y >= 36 && y <= 60) inside = true;
+                // horn cone widening from the box to the right
+                if (x > 30 && x <= 52)
+                {
+                    float top = 36f - (x - 30) * (18f / 22f);
+                    float bot = 60f + (x - 30) * (18f / 22f);
+                    if (y >= top && y <= bot) inside = true;
+                }
+                float d = Mathf.Sqrt((x - 52f) * (x - 52f) + (y - 48f) * (y - 48f));
+                if (muted)
+                {
+                    // big X over the sound area
+                    float d1 = Mathf.Abs(x - (118f - y));
+                    float d2 = Mathf.Abs(x - (y + 8f));
+                    if (x >= 58 && x <= 84 && y >= 28 && y <= 68 && (d1 < 5f || d2 < 5f)) inside = true;
+                }
+                else
+                {
+                    // two sound arcs fanning right of the horn
+                    if (x > 53 && ((d >= 12f && d <= 16f) || (d >= 20f && d <= 24f))) inside = true;
+                }
+                return inside ? Color.white : new Color(1f, 1f, 1f, 0f);
+            });
+        }
+
+        /// <summary>Like LoadOrCreateTexture but imports as a UI sprite.</summary>
+        static Sprite LoadOrCreateSprite(string path, int w, int h, System.Func<int, int, int, int, Color> pixel)
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Textures")) AssetDatabase.CreateFolder("Assets", "Textures");
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    tex.SetPixel(x, y, pixel(x, y, w, h));
+            tex.Apply();
+            File.WriteAllBytes(Path.Combine(Application.dataPath, path.Substring("Assets/".Length)), tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+            AssetDatabase.ImportAsset(path);
+            var imp = (TextureImporter)AssetImporter.GetAtPath(path);
+            imp.textureType = TextureImporterType.Sprite;
+            imp.spriteImportMode = SpriteImportMode.Single;
+            imp.mipmapEnabled = false;
+            imp.filterMode = FilterMode.Bilinear;
+            imp.alphaIsTransparency = true;
+            imp.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
     }
 }

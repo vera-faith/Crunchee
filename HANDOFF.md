@@ -4,12 +4,15 @@ Read this first if you're picking up the project cold. This describes the curren
 
 ## What it is now
 - 3D ASMR squishy game in Unity 6 (6000.6.7f1), Built-in Render Pipeline (NOT URP), iOS target.
-- Two playable themes, each an endless upward helix with no finish platform:
-  - **Bakery Spiral** (`Assets/Scenes/ButterPath.unity`): plain/wax butter, flour bags, vanilla-extract bowls and croissants, with bakery display columns, clouds, floating ingredients and tools.
-  - **Classic Butter** (`Assets/Scenes/ClassicButter.unity`): yellow butter sticks with plain, sugar and 1–5 layer wax coatings, plus simpler cream/yellow decor.
-- Twenty path slots per turn; fifteen reusable item templates per theme. Landings spawn ahead and remove items safely behind. With `ahead = 25` and `keepBehind = 5`, the expected active count is 31.
-- The camera slowly orbits with the course, not with the bunny's facing. The bunny can turn freely.
+- Two playable themes, each an endless climb around a giant CUBE tower (Nov 9, reference video: the map is like a cube box, items line its sides and spiral up):
+  - **Bakery Spiral** (`Assets/Scenes/ButterPath.unity`): plain/wax butter, flour sacks, vanilla-extract bowls and croissants on a pastry-cream tower.
+  - **Classic Butter** (`Assets/Scenes/ClassicButter.unity`): yellow butter sticks with plain, sugar and 1–5 layer wax coatings on a butter-yellow tower.
+- Twenty path slots per turn = 5 per side; spacing alternates walk-together steps and real JUMP gaps (parkour). Some butters are SpinPlatforms (turntable) and carry her — she has to walk against the drag. The tower wall is the inner rail she walks against.
+- Only butters are sticks; other items have their own silhouettes (pillow flour sack, saucer bowl, crescent croissant).
+- Fifteen reusable item templates per theme. Landings spawn ahead and remove items safely behind. With `ahead = 25` and `keepBehind = 5`, the expected active count is 31.
+- The camera slowly orbits the course (per-side tangent yaw), not the bunny's facing. The bunny can turn freely.
 - The ten progress pips loop with total cracked-item count. Falling respawns at the last landed squishy rather than sending a high player back to the start.
+- Halohalo-style corner UI: menu (≡) top-left opens the same settings panel; speaker mute toggle top-right (persisted via `AsmrAudio.Muted`).
 
 ## Verified in this branch
 - Commit `ba4f7fc` — taller labeled butter sticks, readable physical wax plates, contact-centered chips, improved exposure and coating effects.
@@ -25,7 +28,9 @@ Read this first if you're picking up the project cold. This describes the curren
 - **Crunchee → Build All Themes** builds both while preserving shared mesh GUIDs and separate `bakerySky.mat` / `classicbutterSky.mat` assets.
 - `Assets/Scripts/Game/SquishyThemes.cs` is the theme sequence/palette source of truth. Add future themes there first.
 - `Assets/Editor/ButterPathBuilder.cs` builds the selected scene, templates, initial steps, environment chunks, bunny, camera, audio and UI.
-- `Assets/Scripts/Game/EndlessSquishyPath.cs` owns helix positions, bounded recycling, environment-loop movement and course yaw.
+- `Assets/Scripts/Game/EndlessSquishyPath.cs` owns the square-tower path (slot positions, side yaws, per-side jump-gap spacing), bounded recycling, environment-loop movement and course yaw.
+- `Assets/Scripts/Game/SpinPlatform.cs` is the parkour turntable (degrees/sec, surface velocity the player controller carries).
+- `Assets/Scripts/UI/MuteButton.cs` is the top-right speaker toggle; the top-left ≡ button reuses SettingsMenu.
 - `Assets/Editor/ButterPathBuilder.BakeryItems.cs` builds the flour/vanilla/croissant gameplay items.
 - `Assets/Editor/ButterPathBuilder.Wax.cs` builds butter, labels, sugar crystals, layered wax shells and Voronoi plates.
 - **Crunchee → Build iOS (Xcode project)** exports all available scenes from `MapCatalog` to `Builds/iOS`. Build both themes first so both scene files exist.

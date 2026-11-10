@@ -43,6 +43,13 @@ namespace Crunchee.Audio
             set => PlayerPrefs.SetFloat("crunchee.asmrVolume", Mathf.Clamp01(value));
         }
 
+        // The corner mute button's master switch (music + ASMR together).
+        public static bool Muted
+        {
+            get => PlayerPrefs.GetInt("crunchee.muted", 0) == 1;
+            set { PlayerPrefs.SetInt("crunchee.muted", value ? 1 : 0); if (Instance) Instance.ApplyMute(); }
+        }
+
         void Awake()
         {
             if (Instance != null) { Destroy(gameObject); return; }
@@ -58,6 +65,7 @@ namespace Crunchee.Audio
             musicSource.playOnAwake = false; musicSource.loop = true;
             musicSource.spatialBlend = 0f;
             ApplyMusicVol();
+            ApplyMute();
         }
 
         void Start()
@@ -80,6 +88,11 @@ namespace Crunchee.Audio
         {
             // -6 dB while ducked (x0.5), smooth via the Update lerp
             if (musicSource) musicSource.volume = MusicVolume * Mathf.Lerp(1f, 0.5f, duck);
+        }
+
+        void ApplyMute()
+        {
+            AudioListener.volume = Muted ? 0f : 1f;
         }
 
         // ------------------------------------------------- public API
