@@ -57,10 +57,11 @@ namespace Crunchee.Core
         public Material crackedShellMaterial;
         Material dentMat; Vector3 dentBaseScale; float dentShown;
         Vector3 trackPos; float trackTime = -10f;
+        float stepPulse; // 1 on each footstep, decays fast - the dent throbs under her feet
 
         public bool Cracked => cracked;
         /// <summary>Depth of the soft bowl under her feet right now (drives the shader dent).</summary>
-        public float DentDepth => (0.05f + profile.squishDepth * 0.28f) * Mathf.Clamp01(sink);
+        public float DentDepth => (0.06f + profile.squishDepth * 0.3f) * Mathf.Clamp01(sink) + stepPulse * 0.055f;
         public float TopY => col != null ? col.bounds.max.y : transform.position.y;
 
         void Awake()
@@ -122,6 +123,7 @@ namespace Crunchee.Core
 
         void Update()
         {
+            stepPulse = Mathf.MoveTowards(stepPulse, 0f, Time.deltaTime * 3.2f);
             // Soft jelly spring (Nov 6, "make them squish better"): she
             // presses it down with a little give-and-settle wobble, and it
             // springs back up with an overshoot when she leaves.
@@ -182,7 +184,13 @@ namespace Crunchee.Core
         public void SetOccupied(bool value) => occupied = value;
 
         /// <summary>Player reports her position every frame while on this squishy (drives the dent).</summary>
-        public void TrackPlayer(Vector3 worldPos) { trackPos = worldPos; trackTime = Time.time; }
+        public void TrackPlayer(Vector3 worldPos)
+        {
+            trackPos = worldPos; trackTime = Time.time;
+            // The cracked plates keep pressing down exactly under her feet as
+            // she walks - the broken shell follows her, not just her steps.
+            if (cracked) FlexShellAt(worldPos);
+        }
 
         /// <summary>First touch: crack + sound + particles, then the sink takes over.</summary>
         public void OnLanded(float impactSpeed, Vector3 worldPos)
@@ -226,6 +234,7 @@ namespace Crunchee.Core
         public void OnStep(Vector3 worldPos)
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
+            stepPulse = 1f; // a visible extra squish throb at each footstep
             if (coating == Coating.Wax || crackableCrust) { SpawnStepChips(worldPos); FlexShellAt(worldPos); }
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
                                coating == Coating.Wax ? waxLayers : 0, walkedSteps++);
@@ -240,7 +249,7 @@ namespace Crunchee.Core
             {
                 var p = shellPieces[i].position;
                 float d = Vector2.Distance(new Vector2(p.x, p.z), new Vector2(worldPos.x, worldPos.z));
-                float press = Mathf.Clamp01(1f - d / 1.15f) * (0.7f + waxLayers * 0.03f);
+                float press = Mathf.Clamp01(1f - d / 1.35f) * (0.7f + waxLayers * 0.03f);
                 piecePress[i] = Mathf.Max(piecePress[i], press);
             }
         }

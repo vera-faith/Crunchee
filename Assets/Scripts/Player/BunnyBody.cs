@@ -98,13 +98,14 @@ namespace Crunchee.Player
             armRaise = Mathf.Clamp(armRaise, -0.15f, 1.2f);
 
             // --- Walk cycle ---
-            float legSwing = 0f, armSwing = 0f, bobY = 0f;
+            float legSwing = 0f, armSwing = 0f, armBounce = 0f, bobY = 0f;
             if (grounded && planar > 0.4f)
             {
-                walkPhase += dt * planar * 2.6f;
-                legSwing = Mathf.Sin(walkPhase) * 34f;
-                armSwing = Mathf.Sin(walkPhase) * 14f;
-                bobY = Mathf.Abs(Mathf.Cos(walkPhase)) * 0.05f;
+                walkPhase += dt * planar * 2.9f;
+                legSwing = Mathf.Sin(walkPhase) * 40f;
+                armSwing = Mathf.Sin(walkPhase) * 27f;
+                armBounce = Mathf.Abs(Mathf.Cos(walkPhase)) * 6f; // little outward bounce on each step
+                bobY = Mathf.Abs(Mathf.Cos(walkPhase)) * 0.075f;
             }
             else
             {
@@ -118,16 +119,16 @@ namespace Crunchee.Player
             // so the pivot roll is just a small outward splay to flop around.
             if (earL != null) earL.localRotation = Quaternion.Euler(earPitch, 0f, -8f + earRoll);
             if (earR != null) earR.localRotation = Quaternion.Euler(earPitch, 0f, 8f - earRoll);
-            if (armL != null) armL.localRotation = Quaternion.Euler(-armSwing - armRaise * 22f, 0f, -10f - armRaise * 150f);
-            if (armR != null) armR.localRotation = Quaternion.Euler(armSwing - armRaise * 22f, 0f, 10f + armRaise * 150f);
-            if (legL != null) legL.localRotation = Quaternion.Euler(legTargetL, 0f, 0f);
-            if (legR != null) legR.localRotation = Quaternion.Euler(legTargetR, 0f, 0f);
+            if (armL != null) armL.localRotation = Quaternion.Euler(-armSwing - armRaise * 22f, 0f, -10f - armBounce - armRaise * 150f);
+            if (armR != null) armR.localRotation = Quaternion.Euler(armSwing - armRaise * 22f, 0f, 10f + armBounce + armRaise * 150f);
+            if (legL != null) legL.localRotation = Quaternion.Euler(legTargetL, 0f, -3f);
+            if (legR != null) legR.localRotation = Quaternion.Euler(legTargetR, 0f, 3f);
             if (bob != null)
             {
                 float breatheY = grounded && planar <= 0.4f ? Mathf.Sin(breath * 1.8f) * 0.008f : 0f;
                 bob.localPosition = new Vector3(0f, bobY + breatheY, 0f);
-                float lean = grounded ? planar * 1.1f : 2f;          // eager little forward lean
-                float sway = grounded && planar > 0.4f ? Mathf.Sin(walkPhase) * 2.2f : 0f;
+                float lean = grounded ? planar * 1.2f : 2f;          // eager little forward lean
+                float sway = grounded && planar > 0.4f ? Mathf.Sin(walkPhase) * 2.8f : 0f;
                 bob.localRotation = Quaternion.Euler(lean, 0f, sway);
                 float br = grounded && planar <= 0.4f ? 1f + Mathf.Sin(breath * 1.8f) * 0.012f : 1f;
                 bob.localScale = new Vector3(1f, br, 1f);

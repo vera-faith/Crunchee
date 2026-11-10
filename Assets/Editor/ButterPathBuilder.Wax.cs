@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using Crunchee.Core;
+using Crunchee.Game;
 
 namespace Crunchee.EditorTools
 {
@@ -18,7 +19,7 @@ namespace Crunchee.EditorTools
         /// coordinates, so a step can sit at any angle (the spiral staircase).
         /// The Squishy and its decals stay parented under the body exactly as
         /// before, so all of their local-space math is unchanged.</summary>
-        static GameObject BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default, bool wrapped = true)
+        static GameObject BuildButter(Vector3 pos, string name, Coating coating, int waxLayers, Material butterMat, Material patMat, float yawDeg = 0f, float depth = 0f, Color polishColor = default, bool wrapped = true, float spin = 0f)
         {
             if (depth <= 0f) depth = ButterD;
             waxLayers = Mathf.Clamp(waxLayers, 1, 10);
@@ -28,6 +29,13 @@ namespace Crunchee.EditorTools
 
             var step = ChildBox(group.transform, "Body", Vector3.zero, new Vector3(ButterW, ButterH, depth), butterMat, true);
             Roundify(step, 0.18f); // soft, well-rounded butter block (reference image)
+
+            // Parkour spinner (Nov 9): the whole stick turntables in place.
+            if (spin != 0f)
+            {
+                var spinner = step.AddComponent<SpinPlatform>();
+                spinner.degreesPerSecond = spin;
+            }
 
             if (PatH > 0f)
             {
@@ -167,6 +175,20 @@ namespace Crunchee.EditorTools
                 ChildBox(surfaceArtwork.transform, "PaperLabel",
                          new Vector3(0f, (patTop + 0.006f) / ButterH, 0f),
                          new Vector3(0.8f, 0.012f / ButterH, 0.64f), paper, false);
+                // The folded paper ends of a real wrapped butter stick: a band
+                // around each end plus a tiny crimp ridge, so the wrapper
+                // reads as packaging, not just a printed top.
+                var fold = Mat("ButterWrapFold", new Color(0.97f, 0.88f, 0.7f), 1f, 0.32f);
+                NoSheen(fold);
+                foreach (var s in new[] { -1f, 1f })
+                {
+                    ChildBox(surfaceArtwork.transform, "EndFold",
+                             new Vector3(0f, (patTop * 0.4f) / ButterH, s * 0.472f),
+                             new Vector3(0.86f, 0.6f * patTop / ButterH + 0.1f, 0.05f), fold, false);
+                    ChildBox(surfaceArtwork.transform, "EndCrimp",
+                             new Vector3(0f, (patTop + 0.01f) / ButterH, s * 0.44f),
+                             new Vector3(0.7f, 0.02f / ButterH, 0.07f), fold, false);
+                }
                 var print = new GameObject("ButterPrint");
                 print.transform.SetParent(surfaceArtwork.transform, false);
                 print.transform.localPosition = new Vector3(0f, (patTop + 0.014f) / ButterH, 0f);

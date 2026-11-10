@@ -140,44 +140,42 @@ namespace Crunchee.EditorTools
             MeshPart(bt, "CaramelBody", SaveMesh(bodyCaramelMesh, "BunnyCaramelBody"), caramel);
 
             // ------------------------------------------------ ears (own SDF meshes under the existing pivots)
-            // Each ear: cream drooping blade + a honey caramel coat over its
-            // upper/outer half with a drip. ~55-60 deg from vertical, tips
-            // out and down like the reference.
+            // Normal lop ears now (v13, "fix the ears, make it look normal"):
+            // they start off the crown and hang DOWN beside the cheeks like a
+            // real lop rabbit - a leaf-shaped blade that widens then rounds at
+            // the tip, with the caramel coat only near the root.
             foreach (var side in new[] { -1f, 1f })
             {
                 string sfx = side < 0f ? "L" : "R";
                 var pivot = new GameObject("EarPivot" + sfx);
                 pivot.transform.SetParent(bt, false);
-                pivot.transform.localPosition = new Vector3(side * 0.42f, 1.26f, -0.02f);
+                pivot.transform.localPosition = new Vector3(side * 0.38f, 1.30f, -0.03f);
                 pivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 8f);
                 var pt = pivot.transform;
 
-                // Big wide lop ears (v12b): ~60 deg from vertical, sticking
-                // out to the sides and drooping, clearly two ears from the
-                // behind/above gameplay camera.
-                var axis = new Vector3(side * 1.05f, -0.6f, 0f).normalized;
+                var axis = new Vector3(side * 0.34f, -1f, -0.08f).normalized; // mostly down, gently out+back
                 var thin = (Vector3.forward - axis * Vector3.Dot(axis, Vector3.forward)).normalized;
                 var earRot = Quaternion.LookRotation(thin, axis); // local y -> ear axis, local z -> thickness
                 float EarSd(Vector3 p)
                 {
-                    float root = SdfMesher.Ellipsoid(p, axis * 0.12f, new Vector3(0.17f, 0.20f, 0.08f), earRot);
-                    float mid = SdfMesher.Ellipsoid(p, axis * 0.50f, new Vector3(0.27f, 0.27f, 0.09f), earRot);
-                    float tip = SdfMesher.Ellipsoid(p, axis * 0.85f, new Vector3(0.22f, 0.21f, 0.10f), earRot);
-                    return SdfMesher.Smin(SdfMesher.Smin(root, mid, 0.08f), tip, 0.08f);
+                    float root = SdfMesher.Ellipsoid(p, axis * 0.10f, new Vector3(0.18f, 0.19f, 0.10f), earRot);
+                    float mid = SdfMesher.Ellipsoid(p, axis * 0.44f, new Vector3(0.23f, 0.25f, 0.11f), earRot);
+                    float tip = SdfMesher.Ellipsoid(p, axis * 0.78f, new Vector3(0.18f, 0.19f, 0.10f), earRot);
+                    return SdfMesher.Smin(SdfMesher.Smin(root, mid, 0.09f), tip, 0.09f);
                 }
                 SdfMesher.Field earF = p => EarSd(p);
                 SdfMesher.Field earCoatF = p =>
                 {
-                    // Solid honey glaze over the half nearer the head + a drip.
+                    // Honey caramel glaze over the half nearer the head + a drip.
                     float along = Vector3.Dot(p, axis);
-                    float f = SdfMesher.Smax(EarSd(p) - 0.028f, along - 0.5f, 0.05f);
-                    float drip = SdfMesher.Capsule(p, axis * 0.45f, axis * 0.64f, 0.055f);
+                    float f = SdfMesher.Smax(EarSd(p) - 0.028f, along - 0.44f, 0.05f);
+                    float drip = SdfMesher.Capsule(p, axis * 0.38f, axis * 0.56f, 0.05f);
                     return SdfMesher.Smin(f, drip, 0.03f);
                 };
                 // bounds must cover the OUTWARD direction per side - the
                 // left ear reaches -x, so a +x-only box clipped it to a nub.
-                var bmin = new Vector3(side > 0f ? -0.25f : -1.15f, -0.85f, -0.35f);
-                var bmax = new Vector3(side > 0f ? 1.15f : 0.25f, 0.3f, 0.35f);
+                var bmin = new Vector3(side > 0f ? -0.35f : -0.95f, -1.05f, -0.35f);
+                var bmax = new Vector3(side > 0f ? 0.95f : 0.35f, 0.35f, 0.35f);
                 var em = SdfMesher.Build(earF, bmin, bmax, 48);
                 em.name = $"BunnyEar{sfx}";
                 MeshPart(pt, "Ear", SaveMesh(em, $"BunnyEar{sfx}"), cream);
@@ -212,26 +210,27 @@ namespace Crunchee.EditorTools
             Face("Tongue", new Vector3(0f, -0.265f, 1f), new Vector3(0.055f, 0.028f, 0.025f), 0.022f, tongueM);
 
             // ------------------------------------------------ limbs on the existing pivots
-            // Tiny caramel arms with cream hands + cream legs/feet (BunnyBody
-            // swings them). Bases sit inside the body surface: attached, not floating.
+            // Chubbier caramel arms with cream hands + cream legs with big
+            // bunny feet (BunnyBody swings them in the walk cycle). Bases sit
+            // inside the body surface: attached, not floating.
             foreach (var side in new[] { -1f, 1f })
             {
                 string sfx = side < 0f ? "L" : "R";
                 var armPivot = new GameObject("ArmPivot" + sfx);
                 armPivot.transform.SetParent(bt, false);
-                armPivot.transform.localPosition = new Vector3(side * 0.35f, 0.44f, 0.06f);
-                armPivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 10f);
-                Part(PrimitiveType.Capsule, armPivot.transform, "Arm", new Vector3(0f, -0.1f, 0f), new Vector3(0.17f, 0.18f, 0.16f), caramel);
-                Part(PrimitiveType.Sphere, armPivot.transform, "Hand", new Vector3(0f, -0.22f, 0f), new Vector3(0.13f, 0.12f, 0.12f), cream);
+                armPivot.transform.localPosition = new Vector3(side * 0.36f, 0.5f, 0.05f);
+                armPivot.transform.localRotation = Quaternion.Euler(0f, 0f, side * 12f);
+                Part(PrimitiveType.Capsule, armPivot.transform, "Arm", new Vector3(0f, -0.13f, 0f), new Vector3(0.2f, 0.26f, 0.19f), caramel);
+                Part(PrimitiveType.Sphere, armPivot.transform, "Hand", new Vector3(0f, -0.31f, 0f), new Vector3(0.16f, 0.15f, 0.15f), cream);
             }
             foreach (var side in new[] { -1f, 1f })
             {
                 string sfx = side < 0f ? "L" : "R";
                 var legPivot = new GameObject("LegPivot" + sfx);
                 legPivot.transform.SetParent(bt, false);
-                legPivot.transform.localPosition = new Vector3(side * 0.2f, 0.16f, 0.03f);
-                Part(PrimitiveType.Sphere, legPivot.transform, "Leg", new Vector3(0f, -0.05f, 0.01f), new Vector3(0.19f, 0.17f, 0.19f), cream);
-                Part(PrimitiveType.Sphere, legPivot.transform, "Foot", new Vector3(0f, -0.1f, 0.08f), new Vector3(0.23f, 0.11f, 0.32f), cream);
+                legPivot.transform.localPosition = new Vector3(side * 0.21f, 0.18f, 0.03f);
+                Part(PrimitiveType.Sphere, legPivot.transform, "Leg", new Vector3(0f, -0.06f, 0.01f), new Vector3(0.21f, 0.19f, 0.21f), cream);
+                Part(PrimitiveType.Sphere, legPivot.transform, "Foot", new Vector3(0f, -0.12f, 0.09f), new Vector3(0.27f, 0.12f, 0.38f), cream);
             }
             return player;
         }
