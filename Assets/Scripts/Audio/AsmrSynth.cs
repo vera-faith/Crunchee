@@ -790,7 +790,12 @@ namespace Crunchee.Audio
             float aEL = Mathf.Exp(-2f * Mathf.PI * 2100f / SR);
             var lpLead = new float[n];
             float eLp = 0;
-            for (int i = 0; i < n; i++) { eLp = aEL * eLp + (1f - aEL) * lead[i]; lpLead[i] = eLp; }
+            for (int pass = 0; pass < 2; pass++)   // pass 0 warms the state across the wrap
+                for (int i = 0; i < n; i++)
+                {
+                    eLp = aEL * eLp + (1f - aEL) * lead[i];
+                    if (pass == 1) lpLead[i] = eLp;
+                }
             for (int i = 0; i < n; i++)
                 music[i] += lead[i] + lpLead[(i - d1 + n) % n] * 0.16f
                        + lpLead[(i - d2 + n) % n] * 0.08f;
