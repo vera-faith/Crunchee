@@ -28,7 +28,7 @@ namespace Crunchee.EditorTools
             group.transform.rotation = Quaternion.Euler(0f, yawDeg, 0f);
 
             var step = ChildBox(group.transform, "Body", Vector3.zero, new Vector3(ButterW, ButterH, depth), butterMat, true);
-            Roundify(step, 0.18f); // soft, well-rounded butter block (reference image)
+            Roundify(step, 0.22f); // soft, well-rounded butter block (reference image)
 
             // Parkour spinner (Nov 9): the whole stick turntables in place.
             if (spin != 0f)
@@ -197,7 +197,9 @@ namespace Crunchee.EditorTools
                 var text = print.AddComponent<TextMesh>();
                 text.text = "BUTTER\nSALTED  •  4 OZ";
                 text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                text.fontSize = 72; text.characterSize = 0.045f;
+                // Same world size as before but rendered at double glyph
+                // resolution, so the wrapper print reads crisp up close.
+                text.fontSize = 144; text.characterSize = 0.024f;
                 text.anchor = TextAnchor.MiddleCenter; text.alignment = TextAlignment.Center;
                 text.color = new Color(0.08f, 0.28f, 0.38f);
                 print.GetComponent<MeshRenderer>().sharedMaterial = WorldLabelMaterial(text.font);
@@ -438,7 +440,7 @@ namespace Crunchee.EditorTools
         /// top (Cull Back), so no camo blotches.</summary>
         static Mesh WaxTopMesh(float hx, float hz, float r, float t)
         {
-            const int ArcSeg = 10, Rings = 8;
+            const int ArcSeg = 12, Rings = 10;
             float bevel = Mathf.Min(0.008f, t * 0.15f);
             var outline = RoundedRectPoly(hx, hz, r, ArcSeg);
             int n = outline.Count;
@@ -562,9 +564,9 @@ namespace Crunchee.EditorTools
             var m = new Material(Shader.Find("Crunchee/Wax")) { name = name };
             m.color = new Color(1f, 0.99f, 0.97f, 1f);
             m.SetFloat("_Thickness", thickness);
-            m.SetFloat("_Glossiness", 0.88f);
-            m.SetFloat("_SpecStrength", 1.45f);
-            m.SetFloat("_EnvStrength", 0.22f);
+            m.SetFloat("_Glossiness", 0.92f);
+            m.SetFloat("_SpecStrength", 1.65f);
+            m.SetFloat("_EnvStrength", 0.28f);
             m.renderQueue = 3000;
             return m;
         }
@@ -576,8 +578,8 @@ namespace Crunchee.EditorTools
             var m = Mat(name, c, 1f, gloss);
             m.mainTexture = ButterSwirlTexture();
             m.SetFloat("_DentAmount", 1f);
-            m.SetFloat("_RimStrength", 0.12f);
-            m.SetFloat("_EnvStrength", 0.12f);
+            m.SetFloat("_RimStrength", 0.14f);
+            m.SetFloat("_EnvStrength", 0.16f);
             return m;
         }
 
@@ -605,7 +607,7 @@ namespace Crunchee.EditorTools
         /// the stick (real butter, subtler than the old strong swirl).</summary>
         static Texture2D ButterSwirlTexture()
         {
-            return LoadOrCreateTexture("Assets/Textures/ButterSwirl.png", 512, 256, (x, y, w, h) =>
+            return LoadOrCreateTexture("Assets/Textures/ButterSwirl.png", 1024, 512, (x, y, w, h) =>
             {
                 float u = x / (float)w, v = y / (float)h;
                 float s = Mathf.Sin(u * 7.3f + Mathf.Sin(v * 5.1f) * 1.4f + v * 2.2f)
@@ -619,7 +621,7 @@ namespace Crunchee.EditorTools
         /// <summary>Soft radial shadow for the dent she presses into a squishy.</summary>
         static Texture2D DentTexture()
         {
-            return LoadOrCreateTexture("Assets/Textures/Dent.png", 128, 128, (x, y, w, h) =>
+            return LoadOrCreateTexture("Assets/Textures/Dent.png", 256, 256, (x, y, w, h) =>
             {
                 float dx = (x - w / 2f) / (w / 2f), dy = (y - h / 2f) / (h / 2f);
                 float d = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy));

@@ -63,7 +63,7 @@ namespace Crunchee.EditorTools
             var text = print.AddComponent<TextMesh>();
             text.text = "FLOUR";
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 72; text.characterSize = 0.09f;
+            text.fontSize = 144; text.characterSize = 0.045f;
             text.anchor = TextAnchor.MiddleCenter; text.color = new Color(0.32f, 0.24f, 0.17f);
             print.GetComponent<MeshRenderer>().sharedMaterial = WorldLabelMaterial(text.font);
 

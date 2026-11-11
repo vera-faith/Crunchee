@@ -121,8 +121,8 @@ namespace Crunchee.EditorTools
             sun.shadowNormalBias = 0.65f;
             AddFillLight();
 
-            var butterMat = ButterBodyMat("Butter", new Color(1f, 0.84f, 0.36f), 0.58f);
-            var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.88f, 0.44f), 0.62f);
+            var butterMat = ButterBodyMat("Butter", new Color(1f, 0.82f, 0.3f), 0.66f);
+            var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.87f, 0.4f), 0.68f);
             var frostingMat = Mat("Frosting", new Color(0.995f, 0.97f, 0.93f), 1f, 0.35f);
             // The start platform hangs just before slot 0 along the course,
             // flush with the tower wall (Nov 9, cube-box map).
@@ -185,8 +185,8 @@ namespace Crunchee.EditorTools
             cam.fieldOfView = 58f;
             var pfx = camGo.AddComponent<CruncheePostFX>();
             pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
-            pfx.exposure = 0.82f; pfx.threshold = 1.35f; pfx.bloomIntensity = 0.08f;
-            pfx.saturation = 1.12f; pfx.contrast = 1.08f; pfx.vignette = 0.24f;
+            pfx.exposure = 0.84f; pfx.threshold = 1.35f; pfx.bloomIntensity = 0.08f;
+            pfx.saturation = 1.16f; pfx.contrast = 1.11f; pfx.vignette = 0.24f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();
             follow.target = player.transform;

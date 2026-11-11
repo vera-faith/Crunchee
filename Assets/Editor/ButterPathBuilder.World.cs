@@ -290,11 +290,11 @@ namespace Crunchee.EditorTools
             if (min < 1e-4f) return;
             float r = radius > 0f ? Mathf.Min(radius, min * 0.49f) : Mathf.Min(0.12f, min * 0.3f);
             // Big slabs (the squishies) get a dense grid so the shader dent can bend them.
-            float cell = s.x > 1.2f && s.z > 1.2f ? 0.16f : 0f;
-            string key = $"RBox_{s.x:0.###}_{s.y:0.###}_{s.z:0.###}_{r:0.###}" + (cell > 0f ? "_g" : "");
+            float cell = s.x > 1.2f && s.z > 1.2f ? 0.12f : 0f;
+            string key = $"RBox_{s.x:0.###}_{s.y:0.###}_{s.z:0.###}_{r:0.###}" + (cell > 0f ? "_g2" : "");
             if (!meshCache.TryGetValue(key, out var mesh))
             {
-                mesh = SaveMesh(RoundedBoxMesh(s, r, 4, s, cell), key);
+                mesh = SaveMesh(RoundedBoxMesh(s, r, 5, s, cell), key);
                 meshCache[key] = mesh;
             }
             mf.sharedMesh = mesh;

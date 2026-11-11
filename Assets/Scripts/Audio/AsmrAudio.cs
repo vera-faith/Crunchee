@@ -9,7 +9,7 @@ namespace Crunchee.Audio
     /// one-shot gets its own AudioSource so pitch/volume never bend a sound
     /// already playing. spatialBlend is low for intimacy. Landing = squish
     /// first, crack ~0.07 s later and LOUDER. Every footstep on wax crackles.
-    /// The cozy tune ducks hard under cracks - the ASMR is always clearly
+    /// The lofi beat ducks hard under cracks - the ASMR is always clearly
     /// on top. Recorded clips (SoundTable) still win when assigned.
     /// </summary>
     public class AsmrAudio : MonoBehaviour
@@ -72,7 +72,7 @@ namespace Crunchee.Audio
         {
             if (musicSource.clip == null)
             {
-                musicSource.clip = Synth("cozy", () => AsmrSynth.CozyTune());
+                musicSource.clip = Synth("lofi", () => AsmrSynth.LofiLoop());
                 musicSource.Play();
             }
         }
