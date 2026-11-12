@@ -197,10 +197,10 @@ namespace Crunchee.EditorTools
             ps.transform.SetParent(parent, false);
             ps.transform.localPosition = new Vector3(0f, BakeryItemTop + 0.12f, 0f);
             var main = ps.main;
-            main.playOnAwake = false; main.maxParticles = 160;
+            main.playOnAwake = false; main.maxParticles = 200;
             main.startColor = color;
-            main.startSize = liquid ? new ParticleSystem.MinMaxCurve(0.045f, 0.13f) : new ParticleSystem.MinMaxCurve(0.07f, 0.2f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, liquid ? 3.4f : 2.2f);
+            main.startSize = liquid ? new ParticleSystem.MinMaxCurve(0.06f, 0.17f) : new ParticleSystem.MinMaxCurve(0.09f, 0.27f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.0f, liquid ? 4.0f : 2.8f);
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.55f, liquid ? 0.9f : 1.25f);
             main.gravityModifier = liquid ? 1.4f : 0.3f;
             var emission = ps.emission; emission.enabled = false;

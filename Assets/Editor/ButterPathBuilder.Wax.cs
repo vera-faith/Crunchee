@@ -241,10 +241,10 @@ namespace Crunchee.EditorTools
             ps.transform.localPosition = new Vector3(0f, (waxTop + 0.06f) / ButterH, 0f);
             var main = ps.main;
             main.startColor = particleColor;
-            main.startSize = coating == Coating.Sugar ? new ParticleSystem.MinMaxCurve(0.035f, 0.095f) : new ParticleSystem.MinMaxCurve(0.045f, 0.11f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(1.4f, 3.4f);
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.45f, 0.9f);
-            main.gravityModifier = 0.85f; main.maxParticles = 180; main.playOnAwake = false;
+            main.startSize = coating == Coating.Sugar ? new ParticleSystem.MinMaxCurve(0.045f, 0.13f) : new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.7f, 4.1f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.1f);
+            main.gravityModifier = 0.85f; main.maxParticles = 240; main.playOnAwake = false;
             var em = ps.emission; em.enabled = false;
             var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(0.32f, 0.04f / ButterH, 0.32f);
             ps.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat(coating == Coating.Sugar);
@@ -274,10 +274,10 @@ namespace Crunchee.EditorTools
             glitter.transform.localPosition = new Vector3(0f, (shellT + 0.06f) / ButterH, 0f);
             var main = glitter.main;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.7f, 1.5f);
-            main.startSpeed = 0f; main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.07f);
+            main.startSpeed = 0f; main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.09f);
             main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.8f, 0.92f, 0.8f), new Color(0.85f, 0.95f, 1f, 1f));
-            main.maxParticles = 60;
-            var emission = glitter.emission; emission.rateOverTime = 24f;
+            main.maxParticles = 90;
+            var emission = glitter.emission; emission.rateOverTime = 34f;
             var shape = glitter.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(0.82f, 0.03f / ButterH, 0.82f);
             glitter.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
         }

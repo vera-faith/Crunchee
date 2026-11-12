@@ -20,6 +20,10 @@ namespace Crunchee.CameraRig
         public Vector3 aimOffset = new Vector3(0f, 0.6f, 1.8f);
         public float posDamp = 6f;      // sideways / forward follow
         public float heightDamp = 3.5f; // softer vertical follow so jumps don't shake the view
+        float punch;
+
+        /// <summary>Impact nudge — camera hops back a beat on a crack (ASMR punch).</summary>
+        public void Punch(float strength = 1f) => punch = Mathf.Max(punch, strength);
 
         public Quaternion ViewRotation
         {
@@ -40,6 +44,11 @@ namespace Crunchee.CameraRig
             float k = 1f - Mathf.Exp(-posDamp * Time.deltaTime);
             float ky = 1f - Mathf.Exp(-heightDamp * Time.deltaTime);
             transform.position = new Vector3(Mathf.Lerp(p.x, want.x, k), Mathf.Lerp(p.y, want.y, ky), Mathf.Lerp(p.z, want.z, k));
+            if (punch > 0.001f)
+            {
+                transform.position += (-transform.forward * 0.28f - Vector3.up * 0.07f) * punch;
+                punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 5f);
+            }
             transform.rotation = ViewRotation;
         }
     }

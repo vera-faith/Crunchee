@@ -133,10 +133,12 @@ namespace Crunchee.Player
                 if (sq != null)
                 {
                     sq.SetOccupied(true);
+                    bool freshCrack = !sq.Cracked;
                     sq.OnLanded(Mathf.Abs(velocity.y), transform.position);
                     groundSpin = sq.GetComponent<Crunchee.Game.SpinPlatform>();
                     spawnPos = transform.position + Vector3.up * 0.65f;
                     if (!wasGrounded) squash?.OnLand();
+                    cameraRig?.GetComponent<Crunchee.CameraRig.ThirdPersonFollow>()?.Punch(freshCrack ? 1f : 0.35f);
                 }
             }
 

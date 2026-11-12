@@ -120,6 +120,14 @@ namespace Crunchee.EditorTools
             sun.shadowBias = 0.03f;
             sun.shadowNormalBias = 0.65f;
             AddFillLight();
+            // Cool rim from high behind - edges pop off the sky, the wax and
+            // glaze sparkle more, and the whole course reads crisper.
+            var rim = new GameObject("RimLight").AddComponent<Light>();
+            rim.type = LightType.Directional;
+            rim.color = new Color(0.72f, 0.85f, 1f);
+            rim.intensity = 0.26f;
+            rim.shadows = LightShadows.None;
+            rim.transform.rotation = Quaternion.Euler(25f, 330f, 0f);
 
             var butterMat = ButterBodyMat("Butter", new Color(1f, 0.82f, 0.3f), 0.66f);
             var patMat = ButterBodyMat("ButterPat", new Color(1f, 0.87f, 0.4f), 0.68f);
@@ -185,7 +193,7 @@ namespace Crunchee.EditorTools
             cam.fieldOfView = 58f;
             var pfx = camGo.AddComponent<CruncheePostFX>();
             pfx.shader = Shader.Find("Hidden/Crunchee/PostFX");
-            pfx.exposure = 0.84f; pfx.threshold = 1.35f; pfx.bloomIntensity = 0.08f;
+            pfx.exposure = 0.84f; pfx.threshold = 1.3f; pfx.bloomIntensity = 0.15f;
             pfx.saturation = 1.16f; pfx.contrast = 1.11f; pfx.vignette = 0.24f;
             camGo.AddComponent<AudioListener>();
             var follow = camGo.AddComponent<ThirdPersonFollow>();

@@ -46,7 +46,9 @@ namespace Crunchee.Core
         Quaternion[] pieceHomeRot, pieceTargetRot;
         float[] piecePress;
         readonly List<Shard> shards = new List<Shard>();
-        static Material shardMat;
+        readonly List<Ring> rings = new List<Ring>();
+        static Material shardMat, ringBaseMat;
+        static Texture2D ringTex;
         [Tooltip("Position along the course; drives the progress pips.")]
         public int pathOrder;
         [Tooltip("Course stage (1 = Butter Path, 2 = Candy Path); the pips show one stage at a time.")]
@@ -129,7 +131,7 @@ namespace Crunchee.Core
             // springs back up with an overshoot when she leaves.
             {
                 float target = occupied ? 1f : 0f;
-                float stiff = occupied ? 14f : 22f, damp = occupied ? 4.2f : 6f;
+                float stiff = occupied ? 14f : 22f, damp = occupied ? 3.3f : 5f;
                 sinkVel += (stiff * (target - sink) - damp * sinkVel) * Time.deltaTime;
                 sink += sinkVel * Time.deltaTime;
                 if (!occupied && Mathf.Abs(sink) < 0.004f && Mathf.Abs(sinkVel) < 0.008f) { sink = 0f; sinkVel = 0f; }
@@ -145,7 +147,7 @@ namespace Crunchee.Core
             if (dentDecal != null && dentMat != null)
             {
                 bool show = occupied && Time.time - trackTime < 0.25f;
-                dentShown = Mathf.MoveTowards(dentShown, show ? 1f : 0f, Time.deltaTime * 5f);
+                dentShown = Mathf.MoveTowards(dentShown, show ? 1f : 0f, Time.deltaTime * 8f);
                 if (dentShown > 0.01f)
                 {
                     dentDecal.enabled = true;
@@ -154,10 +156,10 @@ namespace Crunchee.Core
                     lp.z = Mathf.Clamp(lp.z, -0.46f, 0.46f);
                     var dp = dentDecal.transform.localPosition;
                     dentDecal.transform.localPosition = new Vector3(lp.x, dp.y, lp.z);
-                    float grow = 0.95f + 0.5f * sink;
+                    float grow = 1.05f + 0.6f * sink;
                     dentDecal.transform.localScale = new Vector3(dentBaseScale.x * grow, dentBaseScale.y, dentBaseScale.z * grow);
                     var dc = dentMat.color;
-                    dc.a = 0.9f * dentShown * (0.3f + 0.7f * sink);
+                    dc.a = dentShown * (0.35f + 0.65f * sink);
                     dentMat.color = dc;
                 }
                 else dentDecal.enabled = false;
@@ -178,6 +180,12 @@ namespace Crunchee.Core
             }
             for (int i = shards.Count - 1; i >= 0; i--)
                 if (shards[i].Tick(Time.deltaTime)) { Destroy(shards[i].go); shards.RemoveAt(i); }
+            for (int i = rings.Count - 1; i >= 0; i--)
+                if (rings[i].Tick(Time.deltaTime))
+                {
+                    Destroy(rings[i].go); Destroy(rings[i].mat);
+                    rings.RemoveAt(i);
+                }
         }
 
         /// <summary>Called by the player while standing on this squishy (drives the sink).</summary>
@@ -203,13 +211,14 @@ namespace Crunchee.Core
                 sink = Mathf.Max(sink, 0.12f);
                 sinkVel += 2.6f; // the quick initial give as her weight lands
                 CrackShell(worldPos); // the wax shell breaks into plates, widest where she hit
+                SpawnRing(worldPos, 0.9f + waxLayers * 0.14f);
                 AsmrAudio.PlaySquish(baseMaterial, coating, transform.position,
                                      coating == Coating.Wax ? waxLayers : 1);
                 if (stepParticles != null)
                 {
-                    if (coating == Coating.Wax) stepParticles.Emit(10 + waxLayers * 5);
-                    else if (coating == Coating.Sugar) stepParticles.Emit(42);
-                    else stepParticles.Emit(10);
+                    if (coating == Coating.Wax) stepParticles.Emit(16 + waxLayers * 6);
+                    else if (coating == Coating.Sugar) stepParticles.Emit(64);
+                    else stepParticles.Emit(16);
                 }
 #if UNITY_IOS || UNITY_ANDROID
                 Handheld.Vibrate(); // placeholder: graded haptics later (strength = profile.hapticStrength)
@@ -235,11 +244,11 @@ namespace Crunchee.Core
         {
             if (!cracked) { OnLanded(0f, worldPos); return; }
             stepPulse = 1f; // a visible extra squish throb at each footstep
-            if (coating == Coating.Wax || crackableCrust) { SpawnStepChips(worldPos); FlexShellAt(worldPos); }
+            if (coating == Coating.Wax || crackableCrust) { SpawnStepChips(worldPos); FlexShellAt(worldPos); SpawnRing(worldPos, 0.4f); }
             AsmrAudio.PlayStep(transform.position, baseMaterial, coating,
                                coating == Coating.Wax ? waxLayers : 0, walkedSteps++);
-            if ((coating == Coating.Wax || crackableCrust) && stepParticles != null) stepParticles.Emit(2);
-            if (coating == Coating.Sugar && stepParticles != null) stepParticles.Emit(7);
+            if ((coating == Coating.Wax || crackableCrust) && stepParticles != null) stepParticles.Emit(4);
+            if (coating == Coating.Sugar && stepParticles != null) stepParticles.Emit(10);
         }
 
         void FlexShellAt(Vector3 worldPos)
@@ -265,21 +274,21 @@ namespace Crunchee.Core
                 shardMat = shardMaterial != null ? shardMaterial
                     : new Material(Shader.Find("Crunchee/Candy")) { color = new Color(1f, 1f, 1f, 0.92f) };
             }
-            int count = 3 + (waxLayers >= 5 ? 1 : 0);
+            int count = 4 + (waxLayers >= 5 ? 2 : 0);
             for (int i = 0; i < count; i++)
             {
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.GetComponent<MeshRenderer>().material = shardMat;
                 Destroy(go.GetComponent<Collider>());
-                float sz = Random.Range(0.03f, 0.065f);
+                float sz = Random.Range(0.04f, 0.085f);
                 go.transform.localScale = new Vector3(sz, sz * 0.4f, sz);
-                go.transform.position = new Vector3(at.x + Random.Range(-0.16f, 0.16f), TopY + 0.04f, at.z + Random.Range(-0.16f, 0.16f));
+                go.transform.position = new Vector3(at.x + Random.Range(-0.2f, 0.2f), TopY + 0.04f, at.z + Random.Range(-0.2f, 0.2f));
                 shards.Add(new Shard
                 {
                     go = go,
-                    vel = new Vector3(Random.Range(-0.8f, 0.8f), Random.Range(1.0f, 1.9f), Random.Range(-0.8f, 0.8f)),
+                    vel = new Vector3(Random.Range(-0.9f, 0.9f), Random.Range(1.1f, 2.1f), Random.Range(-0.9f, 0.9f)),
                     spin = Random.Range(-10f, 10f),
-                    life = Random.Range(0.35f, 0.5f),
+                    life = Random.Range(0.4f, 0.6f),
                     age = 0f,
                     baseScale = go.transform.localScale
                 });
@@ -329,9 +338,9 @@ namespace Crunchee.Core
                     // ~0.03 m gap minimum everywhere, blooming wider/deeper/
                     // harder-tilted near the landing - and chunkier the
                     // thicker the wax layer is.
-                    float sep = Mathf.Lerp(0.045f, 0.16f + waxLayers * 0.012f, near);
-                    float drop = Mathf.Lerp(0.025f, 0.06f + waxLayers * 0.008f, near);
-                    float tilt = Mathf.Lerp(5f, 16f + waxLayers * 1.2f, near);
+                    float sep = Mathf.Lerp(0.05f, 0.22f + waxLayers * 0.018f, near);
+                    float drop = Mathf.Lerp(0.03f, 0.08f + waxLayers * 0.01f, near);
+                    float tilt = Mathf.Lerp(7f, 22f + waxLayers * 1.4f, near);
                     pieceTargetPos[i] = home + new Vector3(dir.x * sep / Mathf.Max(0.01f, Mathf.Abs(ls.x)),
                                                             -drop / Mathf.Max(0.01f, Mathf.Abs(ls.y)),
                                                             dir.z * sep / Mathf.Max(0.01f, Mathf.Abs(ls.z)));
@@ -355,21 +364,21 @@ namespace Crunchee.Core
                 shardMat = shardMaterial != null ? shardMaterial
                     : new Material(Shader.Find("Crunchee/Candy")) { color = new Color(1f, 1f, 1f, 0.92f) };
             }
-            int count = coating == Coating.Wax ? 8 + waxLayers * 2 : 8;
+            int count = coating == Coating.Wax ? 12 + waxLayers * 3 : 12;
             for (int i = 0; i < count; i++)
             {
                 var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 go.GetComponent<MeshRenderer>().material = shardMat;
                 Destroy(go.GetComponent<Collider>());
-                float sz = Random.Range(0.05f, 0.12f) * (coating == Coating.Wax ? (0.75f + waxLayers * 0.07f) : 1f);
+                float sz = Random.Range(0.06f, 0.15f) * (coating == Coating.Wax ? (0.8f + waxLayers * 0.08f) : 1f);
                 go.transform.localScale = new Vector3(sz * Random.Range(0.8f, 1.6f), sz * 0.32f, sz);
-                go.transform.position = new Vector3(impact.x + Random.Range(-0.48f, 0.48f), TopY + 0.06f, impact.z + Random.Range(-0.48f, 0.48f));
+                go.transform.position = new Vector3(impact.x + Random.Range(-0.5f, 0.5f), TopY + 0.06f, impact.z + Random.Range(-0.5f, 0.5f));
                 shards.Add(new Shard
                 {
                     go = go,
-                    vel = new Vector3(Random.Range(-1.2f, 1.2f), Random.Range(1.6f, 3.0f), Random.Range(-1.2f, 1.2f)),
+                    vel = new Vector3(Random.Range(-1.5f, 1.5f), Random.Range(2.0f, 3.6f), Random.Range(-1.5f, 1.5f)),
                     spin = Random.Range(-9f, 9f),
-                    life = Random.Range(0.55f, 0.85f),
+                    life = Random.Range(0.65f, 0.95f),
                     age = 0f,
                     baseScale = go.transform.localScale
                 });
@@ -388,6 +397,50 @@ namespace Crunchee.Core
                 float left = life - age;
                 if (left < 0.2f) go.transform.localScale = baseScale * Mathf.Clamp01(left / 0.2f);
                 return age >= life;
+            }
+        }
+
+        /// <summary>
+        /// Expanding shock ring that ripples out across the squishy top on a
+        /// crack (and a faint one on each crackle step) - the readable "thump"
+        /// the ASMR bursts needed.
+        /// </summary>
+        void SpawnRing(Vector3 at, float strength)
+        {
+            if (!Application.isPlaying) return;
+            if (ringBaseMat == null)
+            {
+                ringTex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+                for (int y = 0; y < 64; y++)
+                    for (int x = 0; x < 64; x++)
+                    {
+                        float dx = (x - 32f) / 32f, dy = (y - 32f) / 32f;
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        float a = Mathf.Clamp01(1f - Mathf.Abs(d - 0.62f) / 0.16f);
+                        ringTex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                    }
+                ringTex.Apply();
+                ringBaseMat = new Material(Shader.Find("Crunchee/Particle")) { mainTexture = ringTex };
+            }
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(go.GetComponent<Collider>());
+            go.transform.position = new Vector3(at.x, TopY + 0.07f, at.z);
+            go.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // lie flat on the squishy top
+            var m = new Material(ringBaseMat);
+            go.GetComponent<MeshRenderer>().material = m;
+            rings.Add(new Ring { go = go, mat = m, age = 0f, life = 0.45f, maxScale = 2.4f * strength });
+        }
+
+        class Ring
+        {
+            public GameObject go; public Material mat; public float age, life, maxScale;
+            public bool Tick(float dt)
+            {
+                age += dt;
+                float t = Mathf.Clamp01(age / life);
+                go.transform.localScale = Vector3.one * Mathf.Lerp(0.35f, maxScale, 1f - (1f - t) * (1f - t));
+                mat.SetColor("_TintColor", new Color(1f, 1f, 1f, (1f - t) * 0.85f));
+                return t >= 1f;
             }
         }
     }
