@@ -86,11 +86,12 @@ namespace Crunchee.EditorTools
             dust.transform.SetParent(root, false);
             dust.transform.localPosition = new Vector3(0f, EndlessSquishyPath.TurnHeight / 2f, 0f);
             var main = dust.main;
-            main.loop = true; main.playOnAwake = true; main.maxParticles = 90;
+            main.loop = true; main.playOnAwake = true; main.maxParticles = 150;
             main.startLifetime = new ParticleSystem.MinMaxCurve(3f, 6f);
-            main.startSpeed = 0.08f; main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.1f);
-            main.startColor = new Color(1f, 0.94f, 0.82f, 0.42f);
-            var emission = dust.emission; emission.rateOverTime = 12f;
+            main.startSpeed = 0.14f; main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.15f);
+            main.startColor = new ParticleSystem.MinMaxGradient(
+                new Color(1f, 0.92f, 0.78f, 0.5f), new Color(1f, 1f, 1f, 0.75f));
+            var emission = dust.emission; emission.rateOverTime = 22f;
             var shape = dust.shape; shape.shapeType = ParticleSystemShapeType.Box; shape.scale = new Vector3(26f, EndlessSquishyPath.TurnHeight, 26f);
             dust.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
             return root;

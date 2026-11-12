@@ -112,7 +112,7 @@ namespace Crunchee.EditorTools
             QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
 
             var sun = new GameObject("Sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 0.88f;
+            sun.type = LightType.Directional; sun.intensity = 0.94f;
             sun.color = new Color(1f, 0.9f, 0.78f);
             sun.transform.rotation = Quaternion.Euler(55f, 200f, 0f);
             sun.shadows = LightShadows.Soft;
@@ -204,6 +204,22 @@ namespace Crunchee.EditorTools
             endless.cameraFollow = follow;
             camGo.transform.SetPositionAndRotation(follow.DesiredPosition, follow.ViewRotation);
             pc.cameraRig = camGo.transform;
+
+            // Soft glitter trail drifting off the bunny - the dreamy ASMR
+            // sparkle that hangs in the air behind her as she climbs.
+            var trail = new GameObject("BunnySparkles").AddComponent<ParticleSystem>();
+            trail.transform.SetParent(player.transform, false);
+            trail.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+            var tm = trail.main;
+            tm.simulationSpace = ParticleSystemSimulationSpace.World; // sparkles stay where she was
+            tm.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.4f);
+            tm.startSpeed = new ParticleSystem.MinMaxCurve(0.05f, 0.3f);
+            tm.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.09f);
+            tm.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.92f, 0.7f, 0.5f), new Color(1f, 1f, 1f, 0.85f));
+            tm.maxParticles = 90; tm.gravityModifier = -0.05f; // they float up a touch
+            var tem = trail.emission; tem.rateOverTime = 16f;
+            var tshape = trail.shape; tshape.shapeType = ParticleSystemShapeType.Sphere; tshape.radius = 0.55f;
+            trail.GetComponent<ParticleSystemRenderer>().material = SparkleParticleMat();
 
             var audio = new GameObject("AsmrAudio"); audio.AddComponent<AsmrAudio>();
             BuildUI(player);
